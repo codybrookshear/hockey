@@ -36,10 +36,17 @@
   {{- range .Upcoming}}{{template "game" .}}{{else}}<p class="empty">No more games scheduled.</p>{{end}}
 </section>
 
-{{- with .Scorers}}
+{{- with .Skaters}}
 <section>
-  <h2>Goal scorers</h2>
-  {{template "leaders" .}}
+  <h2>Players</h2>
+  {{template "skaters" .}}
+</section>
+{{- end}}
+
+{{- with .Goalies}}
+<section>
+  <h2>Goalies</h2>
+  {{template "goalies" .}}
 </section>
 {{- end}}
 {{- end}}

@@ -22,12 +22,17 @@ func fakeGameSheet(t *testing.T, override map[string]string) (*Client, *[]string
 			return
 		}
 		name := map[string]string{
-			"/api/season-info/15331":   "season-info-15331.json",
-			"/api/season-info/10562":   "season-info-10562.json",
-			"/api/season-info/10561":   "season-info-10561.json",
-			"/api/standings/15331":     "standings-15331.json",
-			"/api/unified-games/15331": "unified-games-15331.json",
+			"/api/season-info/15331":       "season-info-15331.json",
+			"/api/season-info/10562":       "season-info-10562.json",
+			"/api/season-info/10561":       "season-info-10561.json",
+			"/api/standings/15331":         "standings-15331.json",
+			"/api/unified-games/15331":     "unified-games-15331.json",
+			"/api/goalies/standings/15331": "goalies-15331.json",
+			"/api/leagues/620287/seasons":  "league-seasons-620287.json",
 		}[r.URL.Path]
+		if r.URL.Path == "/api/players/standings/15331" && r.URL.Query().Get("limit") == "100" {
+			name = "players-15331-" + r.URL.Query().Get("offset") + ".json"
+		}
 		if body, ok := override[r.URL.Path]; ok {
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.Write([]byte(body))
@@ -213,20 +218,6 @@ func TestClientRefusesBadResponses(t *testing.T) {
 	}
 }
 
-func TestSeasonLinks(t *testing.T) {
-	page, err := os.ReadFile("testdata/rink-standings-page.html")
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := SeasonLinks(page)
-	if len(got) != 3 || got[0] != 15331 || got[1] != 10562 || got[2] != 10561 {
-		t.Errorf("got %v, want [15331 10562 10561]", got)
-	}
-	if got := SeasonLinks([]byte(`<a href="https://gamesheetstats.com/seasons/7/standings">x</a> https://evil.example/seasons/8`)); len(got) != 1 || got[0] != 7 {
-		t.Errorf("other domains: %v", got)
-	}
-}
-
 func TestCurrent(t *testing.T) {
 	const rhl = 620287
 	fall := Season{ID: 15331, LeagueID: rhl, Public: true, Start: "2026-09-13", End: "2026-11-30", Active: true}
@@ -255,5 +246,84 @@ func TestCurrent(t *testing.T) {
 	}
 	if _, ok := Current([]Season{other}, rhl, "2026-10-04"); ok {
 		t.Error("picked another league's season")
+	}
+}
+
+func TestLeagueSeasons(t *testing.T) {
+	c, _ := fakeGameSheet(t, nil)
+	seasons, err := c.LeagueSeasons(context.Background(), 620287)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(seasons) != 2 {
+		t.Fatalf("%d seasons, want 2", len(seasons))
+	}
+	cur, ok := Current(seasons, 620287, "2026-10-04")
+	if !ok || cur.ID != 15331 || cur.Name != "Fall 2026" {
+		t.Errorf("current: %+v", cur)
+	}
+	if _, err := c.LeagueSeasons(context.Background(), 1); err == nil {
+		t.Error("unknown league: no error")
+	}
+}
+
+func TestSkaters(t *testing.T) {
+	c, paths := fakeGameSheet(t, nil)
+	skaters, err := c.Skaters(context.Background(), 15331)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(skaters) != 329 || len(*paths) != 4 {
+		t.Fatalf("%d skaters in %d requests, want 329 in 4 (pages of 100)", len(skaters), len(*paths))
+	}
+	d := skaters[0]
+	if d.Last != "DUSOME" || d.GP != 3 || d.G != 8 || d.A != 9 || d.PTS != 17 || d.Jersey != "3" ||
+		len(d.Teams) != 1 || d.Teams[0].Abbr != "PIR" || d.Teams[0].ID != 554805 || d.Teams[0].PTS != 17 {
+		t.Errorf("first skater: %+v", d)
+	}
+}
+
+func TestGoalies(t *testing.T) {
+	c, _ := fakeGameSheet(t, nil)
+	goalies, err := c.Goalies(context.Background(), 15331)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(goalies) != 26 {
+		t.Fatalf("%d goalies, want 26", len(goalies))
+	}
+	var played int
+	for _, g := range goalies {
+		if g.GP > 0 {
+			played++
+			if g.SVPct <= 0 || g.GAA <= 0 {
+				t.Errorf("%s: GP %d but SV%% %v GAA %v", g.Last, g.GP, g.SVPct, g.GAA)
+			}
+		} else if g.GAA != 0 {
+			t.Errorf("%s: no games but GAA %v", g.Last, g.GAA)
+		}
+	}
+	if played != 14 {
+		t.Errorf("%d goalies with games, want 14", played)
+	}
+}
+
+func TestPlayersRefuseChangedShape(t *testing.T) {
+	for name, c := range map[string]struct{ path, body string }{
+		"skater without points": {"/api/players/standings/15331", `{"status":"success","data":[{"id":1,"stats":{"gp":1,"g":0,"a":0,"pim":0},"teams":[]}]}`},
+		"skater without id":     {"/api/players/standings/15331", `{"status":"success","data":[{"stats":{"gp":1,"g":0,"a":0,"pts":0,"pim":0}}]}`},
+		"error status":          {"/api/players/standings/15331", `{"status":"error"}`},
+		"goalie without wins":   {"/api/goalies/standings/15331", `{"status":"success","data":[{"id":1,"stats":{"gp":1,"losses":0,"ties":0,"ga":0}}]}`},
+	} {
+		cl, _ := fakeGameSheet(t, map[string]string{c.path: c.body})
+		var err error
+		if strings.Contains(c.path, "goalies") {
+			_, err = cl.Goalies(context.Background(), 15331)
+		} else {
+			_, err = cl.Skaters(context.Background(), 15331)
+		}
+		if err == nil {
+			t.Errorf("%s: accepted", name)
+		}
 	}
 }

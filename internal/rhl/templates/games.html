@@ -47,10 +47,46 @@
 {{- end}}
 {{end}}
 
-{{define "leaders"}}
-<ol class="leaders">
-  {{- range .}}
-  <li><span class="rank">{{.Rank}}</span><span class="who">{{.Name}}{{if .Team}}<a class="abbr" href="/team/{{.TeamID}}">{{.Team}}</a>{{end}}</span><span class="n">{{.Goals}}</span></li>
-  {{- end}}
-</ol>
+{{/* Skaters: the league's leaders (with rank and team) or a team's players (with jersey). */}}
+{{define "skaters"}}
+<table class="stats">
+  <thead>
+    <tr>
+      <th class="num" scope="col">#</th><th class="who" scope="col">Player</th>
+      <th scope="col">GP</th><th scope="col">G</th><th scope="col">A</th><th class="pts" scope="col">PTS</th>
+      <th class="wide" scope="col">PIM</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{- range .}}
+    <tr>
+      <td class="num">{{if .Team}}{{.Rank}}{{else}}{{.Jersey}}{{end}}</td>
+      <td class="who">{{.Name}}{{if .Team}} <a class="abbr" href="/team/{{.TeamID}}">{{.Team}}</a>{{end}}</td>
+      <td>{{.GP}}</td><td>{{.G}}</td><td>{{.A}}</td><td class="pts">{{.PTS}}</td>
+      <td class="wide">{{.PIM}}</td>
+    </tr>
+    {{- end}}
+  </tbody>
+</table>
+{{end}}
+
+{{define "goalies"}}
+<table class="stats">
+  <thead>
+    <tr>
+      <th class="who" scope="col">Goalie</th>
+      <th scope="col">GP</th><th scope="col">W-L-T</th><th scope="col">GAA</th><th class="pts" scope="col">SV%</th>
+      <th class="wide" scope="col">SO</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{- range .}}
+    <tr>
+      <td class="who">{{.Name}}{{if .Team}} <a class="abbr" href="/team/{{.TeamID}}">{{.Team}}</a>{{end}}</td>
+      <td>{{.GP}}</td><td>{{.W}}-{{.L}}-{{.T}}</td><td>{{gaa .GAA}}</td><td class="pts">{{svpct .SVPct}}</td>
+      <td class="wide">{{.SO}}</td>
+    </tr>
+    {{- end}}
+  </tbody>
+</table>
 {{end}}

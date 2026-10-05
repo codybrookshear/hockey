@@ -14,7 +14,8 @@ import (
 
 const (
 	daysShown  = 2  // game days shown before "earlier results" / "later games"
-	leadersTop = 10 // goal leaders listed
+	scorersTop = 10 // scoring leaders listed (more when tied for the last place)
+	scorersMax = 15 // ...but never more than this
 )
 
 type page struct {
@@ -33,7 +34,8 @@ type homeData struct {
 	Later     []day // upcoming, after the first few days
 	Results   []day
 	Earlier   []day
-	Leaders   []leader
+	Scorers   []skater
+	Goalies   []goalie
 }
 
 type teamData struct {
@@ -45,7 +47,8 @@ type teamData struct {
 	Live     []game
 	Upcoming []game
 	Results  []game
-	Scorers  []leader
+	Skaters  []skater
+	Goalies  []goalie
 }
 
 type division struct {
@@ -95,12 +98,24 @@ type goal struct {
 	Team   string // abbreviation
 }
 
-type leader struct {
-	Rank   int // shared by ties
-	Name   string
-	TeamID int
-	Team   string
-	Goals  int
+// skater is a row of a skaters table: the league's leaders (Rank and Team
+// set) or a team's players (Jersey set).
+type skater struct {
+	Rank          int // shared by ties
+	Jersey        string
+	Name          string
+	TeamID        int
+	Team          string // abbreviation(s): subs play for more than one
+	GP, G, A, PTS int
+	PIM           int
+}
+
+type goalie struct {
+	Name            string
+	TeamID          int
+	Team            string
+	GP, W, L, T, SO int
+	GAA, SVPct      float64
 }
 
 func (s *Server) pageData(st stats) page {
@@ -136,7 +151,8 @@ func (s *Server) homeData(st stats) homeData {
 	slices.Reverse(finals) // games come oldest first
 	d.Upcoming, d.Later = split(s.days(upcoming))
 	d.Results, d.Earlier = split(s.days(finals))
-	d.Leaders = leaders(st.Games, 0, leadersTop)
+	d.Scorers = scorers(st.Skaters)
+	d.Goalies = goalies(st.Goalies, 0)
 	return d
 }
 
@@ -175,10 +191,8 @@ func (s *Server) teamData(st stats, id int) (teamData, bool) {
 		}
 	}
 	slices.Reverse(d.Results)
-	d.Scorers = leaders(st.Games, id, 0)
-	for i := range d.Scorers {
-		d.Scorers[i].Team = "" // all the same team
-	}
+	d.Skaters = roster(st.Skaters, id)
+	d.Goalies = goalies(st.Goalies, id)
 	return d, found
 }
 
@@ -251,60 +265,110 @@ func split(days []day) (first, rest []day) {
 	return days[:daysShown], days[daysShown:]
 }
 
-// leaders counts goals in final games (not exhibitions), for one team (or
-// all, team 0), most first, top n (0: all). A player shows under the team
-// of their latest goal; subs score for more than one.
-func leaders(games []gamesheet.Game, team, n int) []leader {
-	type tally struct {
-		leader
-		latest time.Time
-	}
-	byPlayer := map[int]*tally{}
-	for _, g := range games {
-		if !g.Final() || g.Type == "exhibition" {
+// scorers is the league's scoring leaders: by points, then goals, then
+// fewer games; ranks shared by ties on points.
+func scorers(all []gamesheet.Skater) []skater {
+	var out []skater
+	for _, s := range all {
+		if s.GP == 0 || s.PTS == 0 {
 			continue
 		}
-		for _, sd := range []gamesheet.Side{g.Home, g.Visitor} {
-			if team != 0 && sd.ID != team {
-				continue
-			}
-			for _, gl := range sd.Scorers {
-				t := byPlayer[gl.Player.ID]
-				if t == nil {
-					t = &tally{leader: leader{Name: playerName(gl.Player)}}
-					byPlayer[gl.Player.ID] = t
-				}
-				t.Goals++
-				if !g.Start.Before(t.latest) {
-					t.latest, t.TeamID, t.Team = g.Start, sd.ID, sd.Title
+		row := skater{Name: playerName(s.Player), GP: s.GP, G: s.G, A: s.A, PTS: s.PTS, PIM: s.PIM}
+		var abbrs []string
+		for _, t := range s.Teams {
+			if t.GP > 0 && !slices.Contains(abbrs, t.Abbr) {
+				abbrs = append(abbrs, t.Abbr)
+				if row.TeamID == 0 {
+					row.TeamID = t.ID
 				}
 			}
 		}
+		row.Team = strings.Join(abbrs, "/")
+		out = append(out, row)
 	}
-	var out []leader
-	for _, t := range byPlayer {
-		out = append(out, t.leader)
-	}
-	slices.SortFunc(out, func(a, b leader) int {
-		if c := cmp.Compare(b.Goals, a.Goals); c != 0 {
+	slices.SortStableFunc(out, func(a, b skater) int {
+		if c := cmp.Compare(b.PTS, a.PTS); c != 0 {
 			return c
 		}
-		return cmp.Compare(a.Name, b.Name)
+		if c := cmp.Compare(b.G, a.G); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.GP, b.GP)
 	})
 	for i := range out {
 		out[i].Rank = i + 1
-		if i > 0 && out[i].Goals == out[i-1].Goals {
+		if i > 0 && out[i].PTS == out[i-1].PTS {
 			out[i].Rank = out[i-1].Rank
 		}
 	}
-	if n > 0 && len(out) > n {
-		// Keep everyone tied with the last one shown.
-		cut := n
-		for cut < len(out) && out[cut].Goals == out[n-1].Goals {
+	if len(out) > scorersTop {
+		cut := scorersTop
+		for cut < len(out) && cut < scorersMax && out[cut].PTS == out[scorersTop-1].PTS {
 			cut++
 		}
 		out = out[:cut]
 	}
+	return out
+}
+
+// roster is a team's skaters with games, by points: their stats for that
+// team, which differ from their season's if they've subbed elsewhere.
+func roster(all []gamesheet.Skater, team int) []skater {
+	var out []skater
+	for _, s := range all {
+		for _, t := range s.Teams {
+			if t.ID == team && t.GP > 0 {
+				out = append(out, skater{
+					Jersey: s.Jersey, Name: playerName(s.Player),
+					GP: t.GP, G: t.G, A: t.A, PTS: t.PTS, PIM: t.PIM,
+				})
+			}
+		}
+	}
+	slices.SortStableFunc(out, func(a, b skater) int {
+		if c := cmp.Compare(b.PTS, a.PTS); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(b.G, a.G); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Name, b.Name)
+	})
+	return out
+}
+
+// goalies is the goalies with games, for one team (or all, team 0), best
+// save percentage first.
+func goalies(all []gamesheet.Goalie, team int) []goalie {
+	var out []goalie
+	for _, g := range all {
+		for _, t := range g.Teams {
+			if t.GP == 0 || (team != 0 && t.ID != team) {
+				continue
+			}
+			line := t.GoalieLine
+			if team == 0 && len(g.Teams) > 1 {
+				line = g.GoalieLine // league table: the season, whichever teams
+			}
+			row := goalie{
+				Name: playerName(g.Player),
+				GP:   line.GP, W: line.W, L: line.L, T: line.T, SO: line.SO, GAA: line.GAA, SVPct: line.SVPct,
+			}
+			if team == 0 {
+				row.TeamID, row.Team = t.ID, t.Abbr
+			}
+			out = append(out, row)
+			if team == 0 {
+				break // once per goalie
+			}
+		}
+	}
+	slices.SortStableFunc(out, func(a, b goalie) int {
+		if c := cmp.Compare(b.SVPct, a.SVPct); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.GAA, b.GAA)
+	})
 	return out
 }
 
@@ -341,24 +405,24 @@ func periodOrder(p string) int {
 }
 
 // playerName tidies names entered in all capitals (or all lower case):
-// "DEREK DUSOME" → "Derek Dusome", "O'NEIL-SMITH" → "O'Neil-Smith". Mixed
-// case is left as entered.
+// "DEREK DUSOME" → "Derek Dusome", "O'NEIL-SMITH" → "O'Neil-Smith",
+// "MCMACKIN" → "McMackin". Mixed case is left as entered.
 func playerName(p gamesheet.Player) string {
 	name := strings.Join(strings.Fields(p.First+" "+p.Last), " ")
 	if name != strings.ToUpper(name) && name != strings.ToLower(name) {
 		return name
 	}
-	var b strings.Builder
+	runes := []rune(strings.ToLower(name))
 	start := true
-	for _, r := range strings.ToLower(name) {
-		if start {
-			b.WriteRune(unicode.ToUpper(r))
-		} else {
-			b.WriteRune(r)
+	for i, r := range runes {
+		// "Mc" names capitalize the letter after it too.
+		mc := i >= 2 && runes[i-1] == 'c' && runes[i-2] == 'M' && (i == 2 || !unicode.IsLetter(runes[i-3]))
+		if start || mc {
+			runes[i] = unicode.ToUpper(r)
 		}
 		start = r == ' ' || r == '-' || r == '\''
 	}
-	return b.String()
+	return string(runes)
 }
 
 func (s *Server) funcs() template.FuncMap {
@@ -386,5 +450,8 @@ func (s *Server) funcs() template.FuncMap {
 		},
 		"stamp": func(t time.Time) string { return t.Format("3:04 PM") },
 		"list":  func(xs ...any) []any { return xs },
+		// .901, the way save percentage is written
+		"svpct": func(f float64) string { return strings.TrimPrefix(fmt.Sprintf("%.3f", f), "0") },
+		"gaa":   func(f float64) string { return fmt.Sprintf("%.2f", f) },
 	}
 }

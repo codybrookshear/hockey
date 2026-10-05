@@ -3,6 +3,7 @@ package rhl
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -31,14 +32,17 @@ var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 func savedGameSheet(t *testing.T) *countingSource {
 	t.Helper()
 	files := map[string]string{
-		"/api/season-info/15331":   "season-info-15331.json",
-		"/api/season-info/10562":   "season-info-10562.json",
-		"/api/season-info/10561":   "season-info-10561.json",
-		"/api/standings/15331":     "standings-15331.json",
-		"/api/unified-games/15331": "unified-games-15331.json",
+		"/api/season-info/15331":       "season-info-15331.json",
+		"/api/leagues/620287/seasons":  "league-seasons-620287.json",
+		"/api/standings/15331":         "standings-15331.json",
+		"/api/unified-games/15331":     "unified-games-15331.json",
+		"/api/goalies/standings/15331": "goalies-15331.json",
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		name, ok := files[r.URL.Path]
+		if r.URL.Path == "/api/players/standings/15331" {
+			name, ok = "players-15331-"+r.URL.Query().Get("offset")+".json", true
+		}
 		if !ok {
 			http.NotFound(w, r)
 			return
@@ -85,6 +89,27 @@ func (c *countingSource) Season(ctx context.Context, id int) (gamesheet.Season, 
 	return c.Source.Season(ctx, id)
 }
 
+func (c *countingSource) LeagueSeasons(ctx context.Context, id int) ([]gamesheet.Season, error) {
+	if err := c.note("league seasons"); err != nil {
+		return nil, err
+	}
+	return c.Source.LeagueSeasons(ctx, id)
+}
+
+func (c *countingSource) Skaters(ctx context.Context, id int) ([]gamesheet.Skater, error) {
+	if err := c.note("skaters"); err != nil {
+		return nil, err
+	}
+	return c.Source.Skaters(ctx, id)
+}
+
+func (c *countingSource) Goalies(ctx context.Context, id int) ([]gamesheet.Goalie, error) {
+	if err := c.note("goalies"); err != nil {
+		return nil, err
+	}
+	return c.Source.Goalies(ctx, id)
+}
+
 func (c *countingSource) Standings(ctx context.Context, id int) ([]gamesheet.Division, error) {
 	if err := c.note("standings"); err != nil {
 		return nil, err
@@ -97,12 +122,6 @@ func (c *countingSource) Games(ctx context.Context, id int) ([]gamesheet.Game, e
 		return nil, err
 	}
 	return c.Source.Games(ctx, id)
-}
-
-func seasonsPage(t *testing.T) func(context.Context) ([]byte, error) {
-	return func(context.Context) ([]byte, error) {
-		return os.ReadFile("../gamesheet/testdata/rink-standings-page.html")
-	}
 }
 
 type logoLog struct {
@@ -145,7 +164,7 @@ func get(t *testing.T, h http.Handler, target string) *httptest.ResponseRecorder
 
 func TestHome(t *testing.T) {
 	src := savedGameSheet(t)
-	h := newServer(t, Config{Source: src, SeasonsPage: seasonsPage(t)})
+	h := newServer(t, Config{Source: src, League: 620287})
 
 	w := get(t, h, "/")
 	if w.Code != http.StatusOK {
@@ -157,9 +176,12 @@ func TestHome(t *testing.T) {
 		"<h2>A/B Division</h2>", "<h2>B/C Division</h2>",
 		`<a href="/team/554802">Ice Dogs</a>`,
 		`<img class="logo" src="/logo/554802"`,
-		"<h2>Results</h2>", "<h2>Upcoming</h2>", "<h2>Goal leaders</h2>", "<h2>Live</h2>",
+		"<h2>Results</h2>", "<h2>Upcoming</h2>", "<h2>Live</h2>",
+		"<h2>Scoring leaders</h2>", "<h2>Goalies</h2>",
 		"Earlier results", "Later games",
-		"Derek Dusome",                 // from "DEREK DUSOME"
+		`<td class="who">Derek Dusome <a class="abbr" href="/team/554805">PIR</a></td>`, // from "DEREK DUSOME"
+		`<td class="pts">17</td>`,
+		`<td class="pts">.935</td>`,    // the best save percentage first
 		`<span class="tbd">TBD</span>`, // playoff slots
 		`<span class="kind">Playoff</span>`,
 		"Final · Tie",
@@ -183,11 +205,13 @@ func TestHome(t *testing.T) {
 		t.Errorf("CSP %q", got)
 	}
 
-	// The season came from the rink's page: three seasons looked up, once.
+	// The season came from the league's list; everything is fetched once.
 	get(t, h, "/")
 	get(t, h, "/team/554802")
-	if src.count("season") != 3 || src.count("standings") != 1 || src.count("games") != 1 {
-		t.Errorf("calls: %v (want 3 season, 1 standings, 1 games: the rest cached)", src.calls)
+	for what, want := range map[string]int{"league seasons": 1, "season": 0, "standings": 1, "games": 1, "skaters": 1, "goalies": 1} {
+		if got := src.count(what); got != want {
+			t.Errorf("%s fetched %d times, want %d", what, got, want)
+		}
 	}
 }
 
@@ -197,16 +221,16 @@ func TestConfiguredSeason(t *testing.T) {
 	if w := get(t, h, "/"); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Fall 2026") {
 		t.Errorf("GET /: %d", w.Code)
 	}
-	if src.count("season") != 1 {
-		t.Errorf("season looked up %d times, want 1", src.count("season"))
+	if src.count("season") != 1 || src.count("league seasons") != 0 {
+		t.Errorf("calls: %v (want the configured season only)", src.calls)
 	}
 	if _, err := New(Config{Source: src, Location: la, Log: quiet}); err == nil {
-		t.Error("New accepted neither Season nor SeasonsPage")
+		t.Error("New accepted neither Season nor League")
 	}
 }
 
 func TestTeamPage(t *testing.T) {
-	h := newServer(t, Config{Source: savedGameSheet(t), SeasonsPage: seasonsPage(t)})
+	h := newServer(t, Config{Source: savedGameSheet(t), League: 620287})
 	w := get(t, h, "/team/554812") // Orange
 	if w.Code != http.StatusOK {
 		t.Fatalf("GET /team/554812: %d", w.Code)
@@ -214,8 +238,8 @@ func TestTeamPage(t *testing.T) {
 	body := w.Body.String()
 	for _, want := range []string{
 		"<title>Orange · RHL</title>", "<h1>Orange</h1>", "6th in the A/B Division",
-		"<dd>1-3-0</dd>", "<h2>Results</h2>", "<h2>Upcoming</h2>", "<h2>Goal scorers</h2>",
-		"Travis Johannes",
+		"<dd>1-3-0</dd>", "<h2>Results</h2>", "<h2>Upcoming</h2>", "<h2>Players</h2>", "<h2>Goalies</h2>",
+		`<td class="who">Travis Johannes</td>`, // no team label: it's this team
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("team page lacks %q", want)
@@ -278,8 +302,8 @@ func TestLogoURL(t *testing.T) {
 
 func TestGameSheetDown(t *testing.T) {
 	src := savedGameSheet(t)
-	src.fail = map[string]bool{"season": true}
-	h := newServer(t, Config{Source: src, SeasonsPage: seasonsPage(t)})
+	src.fail = map[string]bool{"league seasons": true}
+	h := newServer(t, Config{Source: src, League: 620287})
 	w := get(t, h, "/")
 	if w.Code != http.StatusBadGateway || !strings.Contains(w.Body.String(), "find the current season") {
 		t.Errorf("no season: %d", w.Code)
@@ -295,7 +319,13 @@ func TestGameSheetDown(t *testing.T) {
 		!strings.Contains(body, "<h2>Results</h2>") || strings.Contains(body, "<h2>A/B Division</h2>") {
 		t.Errorf("standings down: %d", w.Code)
 	}
-	// Both down: an error page.
+	// Player stats down too: the rest still shows.
+	src.fail["skaters"] = true
+	h = newServer(t, Config{Source: src, Season: 15331})
+	if b := get(t, h, "/").Body.String(); !strings.Contains(b, "get the player stats") || strings.Contains(b, "Scoring leaders") {
+		t.Error("skaters down: no notice, or a leaders table anyway")
+	}
+	// Standings and games down: an error page.
 	src.fail["games"] = true
 	h = newServer(t, Config{Source: src, Season: 15331})
 	if w := get(t, h, "/"); w.Code != http.StatusBadGateway {
@@ -325,6 +355,9 @@ func TestOtherRoutes(t *testing.T) {
 
 func TestPlayerName(t *testing.T) {
 	for in, want := range map[[2]string]string{
+		{"STEPHEN", "MCMACKIN"}:     "Stephen McMackin",
+		{"mac", "mcd"}:              "Mac McD",
+		{"EMMA", "MC"}:              "Emma Mc",
 		{"DEREK", "DUSOME"}:         "Derek Dusome",
 		{"ryan", "o'neil-smith"}:    "Ryan O'Neil-Smith",
 		{"Gallen", "Pierce-Lackey"}: "Gallen Pierce-Lackey",
@@ -337,29 +370,48 @@ func TestPlayerName(t *testing.T) {
 	}
 }
 
-func TestLeaders(t *testing.T) {
-	g := func(start int, typ string, home gamesheet.Side) gamesheet.Game {
-		return gamesheet.Game{Start: time.Unix(int64(start), 0), Status: "final", Type: typ, Home: home}
+func TestScorersRosterGoalies(t *testing.T) {
+	line := func(gp, g, a int) gamesheet.SkaterLine { return gamesheet.SkaterLine{GP: gp, G: g, A: a, PTS: g + a} }
+	team := func(id int, abbr string, l gamesheet.SkaterLine) gamesheet.SkaterTeam {
+		return gamesheet.SkaterTeam{Team: gamesheet.Team{ID: id, Abbr: abbr}, SkaterLine: l}
 	}
-	scored := func(team int, title string, players ...int) gamesheet.Side {
-		s := gamesheet.Side{Team: gamesheet.Team{ID: team, Title: title}}
-		for _, p := range players {
-			s.Scorers = append(s.Scorers, gamesheet.Goal{Player: gamesheet.Player{ID: p, First: "P", Last: string(rune('A' + p))}})
-		}
-		return s
+	var all []gamesheet.Skater
+	add := func(last string, total gamesheet.SkaterLine, teams ...gamesheet.SkaterTeam) {
+		all = append(all, gamesheet.Skater{Player: gamesheet.Player{ID: len(all) + 1, First: "A", Last: last}, SkaterLine: total, Teams: teams})
 	}
-	games := []gamesheet.Game{
-		g(1, "regular_season", scored(10, "Ten", 1, 1, 2)),
-		g(2, "playoff", scored(20, "Twenty", 1, 3)),    // player 1 subs for Twenty
-		g(3, "exhibition", scored(10, "Ten", 2, 2, 2)), // not counted
+	add("SUB", line(4, 3, 3), team(1, "ONE", line(2, 1, 1)), team(2, "TWO", line(2, 2, 2)))
+	add("STAR", line(3, 5, 1), team(1, "ONE", line(3, 5, 1)))
+	add("OLD", line(0, 0, 0), team(9, "OLD", line(0, 0, 0)), team(1, "ONE", line(0, 0, 0)))
+	for i := range 14 {
+		add(fmt.Sprint("DEPTH", i), line(1, 1, 0), team(2, "TWO", line(1, 1, 0)))
 	}
-	got := leaders(games, 0, 2)
-	// P B: 3 goals, latest for Twenty. Then P C and P D tie at 1: both kept.
-	if len(got) != 3 || got[0].Name != "P B" || got[0].Goals != 3 || got[0].Team != "Twenty" ||
-		got[1].Rank != 2 || got[2].Rank != 2 {
-		t.Errorf("leaders: %+v", got)
+
+	got := scorers(all)
+	// STAR and SUB tie on points; STAR has more goals. Then 14 tied at 1:
+	// cut at scorersMax.
+	if got[0].Name != "A Star" || got[1].Name != "A Sub" || got[1].Rank != 1 || got[1].Team != "ONE/TWO" ||
+		got[2].Rank != 3 || len(got) != scorersMax {
+		t.Errorf("scorers: %+v", got[:3])
 	}
-	if got := leaders(games, 10, 0); len(got) != 2 || got[0].Goals != 2 {
-		t.Errorf("team 10: %+v", got)
+	one := roster(all, 1)
+	// SUB's stats for this team only; OLD (no games) left out.
+	if len(one) != 2 || one[0].Name != "A Star" || one[1].PTS != 2 || one[1].Team != "" {
+		t.Errorf("roster: %+v", one)
+	}
+
+	gl := []gamesheet.Goalie{
+		{Player: gamesheet.Player{First: "a", Last: "busy"}, GoalieLine: gamesheet.GoalieLine{GP: 4, SVPct: .9},
+			Teams: []gamesheet.GoalieTeam{{Team: gamesheet.Team{ID: 1, Abbr: "ONE"}, GoalieLine: gamesheet.GoalieLine{GP: 2, SVPct: .95}},
+				{Team: gamesheet.Team{ID: 2, Abbr: "TWO"}, GoalieLine: gamesheet.GoalieLine{GP: 2, SVPct: .85}}}},
+		{Player: gamesheet.Player{First: "b", Last: "best"}, GoalieLine: gamesheet.GoalieLine{GP: 1, SVPct: .93},
+			Teams: []gamesheet.GoalieTeam{{Team: gamesheet.Team{ID: 2, Abbr: "TWO"}, GoalieLine: gamesheet.GoalieLine{GP: 1, SVPct: .93}}}},
+		{Player: gamesheet.Player{First: "c", Last: "bench"},
+			Teams: []gamesheet.GoalieTeam{{Team: gamesheet.Team{ID: 1, Abbr: "ONE"}}}},
+	}
+	if g := goalies(gl, 0); len(g) != 2 || g[0].Name != "B Best" || g[1].SVPct != .9 || g[1].Team != "ONE" {
+		t.Errorf("league goalies (season totals, once each, no benchwarmers): %+v", g)
+	}
+	if g := goalies(gl, 1); len(g) != 1 || g[0].SVPct != .95 || g[0].Team != "" {
+		t.Errorf("team goalies (that team's line, no team label): %+v", g)
 	}
 }

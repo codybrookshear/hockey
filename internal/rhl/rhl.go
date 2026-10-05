@@ -1,6 +1,6 @@
 // Package rhl serves rhl.brookshear.party: the RHL (The Rink Exchange's adult
-// league) standings, results, upcoming games, goal leaders and team pages,
-// from GameSheet. Public: no login, no cookies, no scripts.
+// league) standings, results, upcoming games, scoring leaders, goalies and
+// team pages, from GameSheet. Public: no login, no cookies, no scripts.
 package rhl
 
 import (
@@ -28,30 +28,30 @@ var files embed.FS
 // Source is GameSheet; *gamesheet.Client in production.
 type Source interface {
 	Season(ctx context.Context, id int) (gamesheet.Season, error)
+	LeagueSeasons(ctx context.Context, league int) ([]gamesheet.Season, error)
 	Standings(ctx context.Context, season int) ([]gamesheet.Division, error)
 	Games(ctx context.Context, season int) ([]gamesheet.Game, error)
+	Skaters(ctx context.Context, season int) ([]gamesheet.Skater, error)
+	Goalies(ctx context.Context, season int) ([]gamesheet.Goalie, error)
 }
 
 const (
-	seasonFreshFor = 6 * time.Hour   // which season is current
-	statsFreshFor  = 3 * time.Minute // standings and games: live scores move
-	logoFreshFor   = 24 * time.Hour
-	retryAfter     = time.Minute
-	perMinute      = 20 // requests a minute, to GameSheet and, separately, to its image CDN
-	maxSeasonLinks = 10
+	seasonFreshFor  = 6 * time.Hour    // which season is current
+	statsFreshFor   = 3 * time.Minute  // standings and games: live scores move
+	playersFreshFor = 10 * time.Minute // player stats: a few pages each, and change only after games
+	logoFreshFor    = 24 * time.Hour
+	retryAfter      = time.Minute
+	perMinute       = 20 // fetches a minute, to GameSheet and, separately, to its image CDN
 )
 
 type Config struct {
-	Source Source
-	// SeasonsPage returns the rink's standings page, whose GameSheet widgets
-	// link to the league's seasons. Unused when Season is set.
-	SeasonsPage func(ctx context.Context) ([]byte, error)
-	Season      int // the season to show; 0 = the current one, from SeasonsPage
-	League      int // GameSheet league ID: seasons from other leagues are ignored
-	Logo        func(ctx context.Context, url string) (Logo, error)
-	Location    *time.Location
-	Log         *slog.Logger
-	Now         func() time.Time // nil = time.Now
+	Source   Source
+	Season   int // the GameSheet season to show; 0 = League's current one
+	League   int // the GameSheet league
+	Logo     func(ctx context.Context, url string) (Logo, error)
+	Location *time.Location
+	Log      *slog.Logger
+	Now      func() time.Time // nil = time.Now
 }
 
 type Server struct {
@@ -59,6 +59,8 @@ type Server struct {
 	season    *cache.Cache[gamesheet.Season]
 	standings *cache.Cache[[]gamesheet.Division]
 	games     *cache.Cache[[]gamesheet.Game]
+	skaters   *cache.Cache[[]gamesheet.Skater]
+	goalies   *cache.Cache[[]gamesheet.Goalie]
 	logos     *cache.Cache[Logo]
 	pages     map[string]*template.Template
 	static    *serve.Static
@@ -71,8 +73,8 @@ func New(cfg Config) (*Server, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
-	if cfg.Season == 0 && cfg.SeasonsPage == nil {
-		return nil, errors.New("rhl: set Season or SeasonsPage")
+	if cfg.Season == 0 && cfg.League == 0 {
+		return nil, errors.New("rhl: set Season or League")
 	}
 	gs := cache.NewLimiter(perMinute, cfg.Now)
 	s := &Server{
@@ -80,6 +82,8 @@ func New(cfg Config) (*Server, error) {
 		season:    cache.New[gamesheet.Season](seasonFreshFor, 5*time.Minute, gs, cfg.Now),
 		standings: cache.New[[]gamesheet.Division](statsFreshFor, retryAfter, gs, cfg.Now),
 		games:     cache.New[[]gamesheet.Game](statsFreshFor, retryAfter, gs, cfg.Now),
+		skaters:   cache.New[[]gamesheet.Skater](playersFreshFor, retryAfter, gs, cfg.Now),
+		goalies:   cache.New[[]gamesheet.Goalie](playersFreshFor, retryAfter, gs, cfg.Now),
 		logos:     cache.New[Logo](logoFreshFor, 10*time.Minute, cache.NewLimiter(perMinute, cfg.Now), cfg.Now),
 		logoURLs:  map[int]string{},
 	}
@@ -117,32 +121,20 @@ func (s *Server) Handler() http.Handler {
 const csp = "default-src 'none'; style-src 'self'; img-src 'self'; " +
 	"base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
-// currentSeason finds the season to show: the configured one, or the current
-// one among those the rink's page links to.
+// currentSeason finds the season to show: the configured one, or the
+// league's current one.
 func (s *Server) currentSeason(ctx context.Context) cache.Result[gamesheet.Season] {
 	return s.season.Get(ctx, "current", func(ctx context.Context) (gamesheet.Season, error) {
 		if s.cfg.Season != 0 {
 			return s.cfg.Source.Season(ctx, s.cfg.Season)
 		}
-		page, err := s.cfg.SeasonsPage(ctx)
+		seasons, err := s.cfg.Source.LeagueSeasons(ctx, s.cfg.League)
 		if err != nil {
-			return gamesheet.Season{}, fmt.Errorf("seasons page: %w", err)
-		}
-		ids := gamesheet.SeasonLinks(page)
-		if len(ids) == 0 {
-			return gamesheet.Season{}, errors.New("seasons page links to no GameSheet seasons")
-		}
-		var seasons []gamesheet.Season
-		for _, id := range ids[:min(len(ids), maxSeasonLinks)] {
-			season, err := s.cfg.Source.Season(ctx, id)
-			if err != nil {
-				return gamesheet.Season{}, err
-			}
-			seasons = append(seasons, season)
+			return gamesheet.Season{}, err
 		}
 		season, ok := gamesheet.Current(seasons, s.cfg.League, gamesheet.Today(s.cfg.Now(), s.cfg.Location))
 		if !ok {
-			return gamesheet.Season{}, fmt.Errorf("none of seasons %v is the league's", ids)
+			return gamesheet.Season{}, fmt.Errorf("league %d has no public seasons", s.cfg.League)
 		}
 		return season, nil
 	})
@@ -153,6 +145,8 @@ type stats struct {
 	Season    gamesheet.Season
 	Divisions []gamesheet.Division
 	Games     []gamesheet.Game
+	Skaters   []gamesheet.Skater
+	Goalies   []gamesheet.Goalie
 	Fetched   time.Time // the oldest of the parts
 	Stale     bool
 	Problems  []string // for visitors; details go to the log
@@ -168,30 +162,33 @@ func (s *Server) load(ctx context.Context) stats {
 		return st
 	}
 	st.Season = sr.Value
-	key := strconv.Itoa(st.Season.ID)
-	dr := s.standings.Get(ctx, key, func(ctx context.Context) ([]gamesheet.Division, error) {
-		return s.cfg.Source.Standings(ctx, st.Season.ID)
-	})
-	gr := s.games.Get(ctx, key, func(ctx context.Context) ([]gamesheet.Game, error) {
-		return s.cfg.Source.Games(ctx, st.Season.ID)
-	})
-	if dr.Err != nil {
-		s.cfg.Log.Warn("standings unavailable", "season", st.Season.ID, "err", dr.Err.Error())
-		st.Problems = append(st.Problems, "Couldn't get the standings from GameSheet right now.")
-	}
-	if gr.Err != nil {
-		s.cfg.Log.Warn("games unavailable", "season", st.Season.ID, "err", gr.Err.Error())
-		st.Problems = append(st.Problems, "Couldn't get the games from GameSheet right now.")
-	}
-	st.Divisions, st.Games = dr.Value, gr.Value
-	for _, r := range []struct {
-		t     time.Time
+	id := st.Season.ID
+	key := strconv.Itoa(id)
+	dr := s.standings.Get(ctx, key, func(ctx context.Context) ([]gamesheet.Division, error) { return s.cfg.Source.Standings(ctx, id) })
+	gr := s.games.Get(ctx, key, func(ctx context.Context) ([]gamesheet.Game, error) { return s.cfg.Source.Games(ctx, id) })
+	sk := s.skaters.Get(ctx, key, func(ctx context.Context) ([]gamesheet.Skater, error) { return s.cfg.Source.Skaters(ctx, id) })
+	gl := s.goalies.Get(ctx, key, func(ctx context.Context) ([]gamesheet.Goalie, error) { return s.cfg.Source.Goalies(ctx, id) })
+	st.Divisions, st.Games, st.Skaters, st.Goalies = dr.Value, gr.Value, sk.Value, gl.Value
+	for _, part := range []struct {
+		what  string
+		err   error
+		at    time.Time
 		stale bool
-	}{{dr.Fetched, dr.Stale}, {gr.Fetched, gr.Stale}} {
-		if !r.t.IsZero() && (st.Fetched.IsZero() || r.t.Before(st.Fetched)) {
-			st.Fetched = r.t
+	}{
+		{"standings", dr.Err, dr.Fetched, dr.Stale},
+		{"games", gr.Err, gr.Fetched, gr.Stale},
+		{"player stats", sk.Err, sk.Fetched, sk.Stale},
+		{"goalie stats", gl.Err, gl.Fetched, gl.Stale},
+	} {
+		if part.err != nil {
+			s.cfg.Log.Warn(part.what+" unavailable", "season", id, "err", part.err.Error())
+			st.Problems = append(st.Problems, "Couldn't get the "+part.what+" from GameSheet right now.")
+			continue
 		}
-		st.Stale = st.Stale || r.stale
+		if st.Fetched.IsZero() || part.at.Before(st.Fetched) {
+			st.Fetched = part.at
+		}
+		st.Stale = st.Stale || part.stale
 	}
 	s.rememberLogos(st)
 	return st

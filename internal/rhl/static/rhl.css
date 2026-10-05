@@ -99,8 +99,9 @@ h3 {
   vertical-align: middle;
 }
 
-/* Standings: fits a 375px phone; GF, GA and streak join on wider screens. */
-.standings {
+/* Standings and stats tables: fit a 375px phone; extra columns (.wide) join
+   on wider screens. */
+.standings, .stats {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
@@ -112,14 +113,14 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
-.standings th, .standings td {
+.standings th, .standings td, .stats th, .stats td {
   padding: 0.5rem 0.3rem;
   text-align: center;
   border-top: 1px solid var(--line);
   white-space: nowrap;
 }
 
-.standings thead th {
+.standings thead th, .stats thead th {
   border-top: 0;
   color: var(--muted);
   font-size: 0.7rem;
@@ -131,13 +132,18 @@ h3 {
 .standings .team { text-align: left; width: 100%; white-space: normal; }
 .standings td.team { display: flex; align-items: center; gap: 0.45rem; font-weight: 600; }
 .standings td.team a { color: var(--fg); }
-.standings .pts { font-weight: 700; }
-.standings td:last-child, .standings th:last-child { padding-right: 0.55rem; }
-.standings .wide { display: none; }
+.standings .pts, .stats .pts { font-weight: 700; }
+.standings td:last-child, .standings th:last-child,
+.stats td:last-child, .stats th:last-child { padding-right: 0.55rem; }
+.standings .wide, .stats .wide { display: none; }
+
+.stats .num { width: 1.8rem; padding-left: 0.5rem; color: var(--muted); }
+.stats .who { text-align: left; width: 100%; white-space: normal; font-weight: 600; }
+.stats .abbr { white-space: nowrap; }
 
 @media (min-width: 30rem) {
-  .standings .wide { display: table-cell; }
-  .standings th, .standings td { padding-left: 0.45rem; padding-right: 0.45rem; }
+  .standings .wide, .stats .wide { display: table-cell; }
+  .standings th, .standings td, .stats th, .stats td { padding-left: 0.45rem; padding-right: 0.45rem; }
 }
 
 /* Game cards: visitor on top, home below, score or time on the right. */
@@ -210,7 +216,7 @@ details.game[open] > summary .meta::after { transform: rotate(225deg); margin-to
 .goals li { display: flex; gap: 0.6rem; padding: 0.2rem 0; }
 .goals .when { color: var(--muted); min-width: 5.2rem; font-variant-numeric: tabular-nums; }
 .goals .who { flex: 1; }
-.goals .abbr, .leaders .abbr { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+.goals .abbr, .stats .abbr { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
 
 details.more > summary {
   padding: 0.6rem 0;
@@ -218,28 +224,6 @@ details.more > summary {
   font-weight: 600;
 }
 details.more[open] > summary { color: var(--muted); }
-
-/* Goal leaders */
-.leaders {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-
-.leaders li {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
-  padding: 0.5rem 0.75rem;
-  border-top: 1px solid var(--line);
-}
-.leaders li:first-child { border-top: 0; }
-.leaders .rank { width: 1.4rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.leaders .who { flex: 1; display: flex; flex-wrap: wrap; gap: 0 0.5rem; align-items: baseline; }
-.leaders .n { font-weight: 800; font-variant-numeric: tabular-nums; }
 
 /* Team page */
 .team-head { display: flex; align-items: center; gap: 0.9rem; margin-top: 1rem; }

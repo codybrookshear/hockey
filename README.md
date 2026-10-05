@@ -8,7 +8,8 @@ to work well on a phone:
   times, teams and locker rooms. (`cmd/schedule`, `internal/schedule`)
 - **[rhl.brookshear.party](https://rhl.brookshear.party)**: the RHL (adult
   league). Standings by division, results with goal scorers, upcoming games,
-  goal leaders and a page per team. (`cmd/rhl`, `internal/rhl`)
+  scoring leaders, goalies, and a page per team with its players' stats.
+  (`cmd/rhl`, `internal/rhl`)
 
 They're separate apps in separate containers. What they share: the cache and
 request limits (`internal/cache`) and server plumbing (`internal/serve`).
@@ -22,20 +23,18 @@ Neither source has a public API.
   renders its daily schedule as HTML. The app fetches that page (a form POST
   picks the date) and parses its table (`internal/frontline`).
 - **RHL:** the league keeps score with [GameSheet](https://gamesheetstats.com).
-  Its stats site loads JSON from `gamesheetstats.com/api/…` (season info,
-  standings, games), unauthenticated and undocumented; the app reads the same
-  (`internal/gamesheet`). The current season is found automatically: the
-  rink's [standings page](https://www.therinkexchange.com/standings--stats.html)
-  links to the league's seasons, and GameSheet says which is active.
-  `RHL_SEASON` pins one instead.
+  Its stats site loads JSON from `gamesheetstats.com/api/…` (the league's
+  seasons, standings, games, player and goalie stats), unauthenticated and
+  undocumented; the app reads the same (`internal/gamesheet`). The current
+  season is the one GameSheet marks active; `RHL_SEASON` pins one instead.
 
 Both are parsed strictly: if a page or response changes shape, the site shows
 an error instead of a wrong table. Tests run against saved copies.
 
 Both sites send each source at most 20 requests a minute, one at a time, and
-cache answers (schedule days 10 minutes; RHL stats 3 minutes; team logos a
-day), whatever their own traffic. If a source is down, the last copy is shown,
-marked as old.
+cache answers (schedule days 10 minutes; RHL standings and games 3 minutes,
+player stats 10; team logos a day), whatever their own traffic. If a source
+is down, the last copy is shown, marked as old.
 
 ## Privacy and security
 

@@ -118,20 +118,8 @@ type Client struct {
 
 func (c *Client) Season(ctx context.Context, id int) (Season, error) {
 	var body struct {
-		Status string `json:"status"`
-		Data   []struct {
-			ID       int    `json:"id"`
-			Title    string `json:"title"`
-			Start    string `json:"start"`
-			End      string `json:"end"`
-			Active   bool   `json:"is_active"`
-			Archived bool   `json:"archived"`
-			Public   bool   `json:"isPublic"`
-			LeagueID int    `json:"leagueId"`
-			League   struct {
-				Title string `json:"title"`
-			} `json:"league"`
-		} `json:"data"`
+		Status string      `json:"status"`
+		Data   []rawSeason `json:"data"`
 	}
 	if err := c.get(ctx, "season-info/"+strconv.Itoa(id), nil, &body); err != nil {
 		return Season{}, err
@@ -139,12 +127,29 @@ func (c *Client) Season(ctx context.Context, id int) (Season, error) {
 	if body.Status != "success" || len(body.Data) != 1 || body.Data[0].ID != id || body.Data[0].Title == "" {
 		return Season{}, fmt.Errorf("season %d: unexpected season-info response", id)
 	}
-	d := body.Data[0]
+	return body.Data[0].season(), nil
+}
+
+type rawSeason struct {
+	ID       int    `json:"id"`
+	Title    string `json:"title"`
+	Start    string `json:"start"`
+	End      string `json:"end"`
+	Active   bool   `json:"is_active"`
+	Archived bool   `json:"archived"`
+	Public   bool   `json:"isPublic"`
+	LeagueID int    `json:"leagueId"`
+	League   struct {
+		Title string `json:"title"`
+	} `json:"league"`
+}
+
+func (r rawSeason) season() Season {
 	return Season{
-		ID: d.ID, Title: d.Title, Name: seasonName(d.Title, d.League.Title),
-		LeagueID: d.LeagueID, League: d.League.Title,
-		Start: d.Start, End: d.End, Active: d.Active && !d.Archived, Public: d.Public,
-	}, nil
+		ID: r.ID, Title: r.Title, Name: seasonName(r.Title, r.League.Title),
+		LeagueID: r.LeagueID, League: r.League.Title,
+		Start: r.Start, End: r.End, Active: r.Active && !r.Archived, Public: r.Public,
+	}
 }
 
 // seasonName drops the league's name from a season's title:
@@ -354,4 +359,28 @@ func (c *Client) get(ctx context.Context, path string, q url.Values, v any) erro
 		return fmt.Errorf("gamesheet %s: %w", path, err)
 	}
 	return nil
+}
+
+// rawBody keeps a response undecoded, for decodeData.
+type rawBody []byte
+
+func (r *rawBody) UnmarshalJSON(b []byte) error {
+	*r = append((*r)[:0], b...)
+	return nil
+}
+
+// decodeData checks a {"status":"success","data":...} response and decodes
+// its data into v.
+func decodeData(b []byte, v any) error {
+	var body struct {
+		Status string          `json:"status"`
+		Data   json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(b, &body); err != nil {
+		return err
+	}
+	if body.Status != "success" || len(body.Data) == 0 {
+		return fmt.Errorf("unexpected response status %q", body.Status)
+	}
+	return json.Unmarshal(body.Data, v)
 }

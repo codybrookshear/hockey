@@ -66,10 +66,17 @@
 </section>
 {{- end}}
 
-{{- with .Leaders}}
+{{- with .Scorers}}
 <section>
-  <h2>Goal leaders</h2>
-  {{template "leaders" .}}
+  <h2>Scoring leaders</h2>
+  {{template "skaters" .}}
+</section>
+{{- end}}
+
+{{- with .Goalies}}
+<section>
+  <h2>Goalies</h2>
+  {{template "goalies" .}}
 </section>
 {{- end}}
 {{end}}

@@ -2,31 +2,12 @@ package gamesheet
 
 import (
 	"cmp"
-	"regexp"
 	"slices"
-	"strconv"
 	"time"
 )
 
-// GameSheet stats widgets link to their season, on either domain.
-var seasonLinkRe = regexp.MustCompile(`(?:gamesheet\.app|gamesheetstats\.com)/seasons/(\d{1,9})\b`)
-
-// SeasonLinks returns the GameSheet season IDs a page links to (the rink's
-// standings page embeds one widget per season), in page order, without
-// repeats.
-func SeasonLinks(page []byte) []int {
-	var ids []int
-	for _, m := range seasonLinkRe.FindAllSubmatch(page, -1) {
-		id, err := strconv.Atoi(string(m[1]))
-		if err == nil && !slices.Contains(ids, id) {
-			ids = append(ids, id)
-		}
-	}
-	return ids
-}
-
 // Current picks the season to show on date (YYYY-MM-DD) from a league's
-// seasons:
+// seasons (LeagueSeasons):
 //
 //  1. an active one (GameSheet's flag) that has started, latest start first;
 //  2. else the latest that has started: between seasons, last season's
