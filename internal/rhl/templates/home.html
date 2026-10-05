@@ -1,6 +1,14 @@
 {{define "title"}}RHL{{with .Season.Name}} · {{.}}{{end}}{{end}}
 
 {{define "content"}}
+{{- with .Divisions}}
+<nav class="divisions" aria-label="Division">
+  {{- range .}}
+  <a href="/?division={{.ID}}"{{if .Selected}} aria-current="page"{{end}}>{{.Title}}</a>
+  {{- end}}
+</nav>
+{{- end}}
+
 {{- with .Live}}
 <section>
   <h2>Live</h2>
@@ -8,9 +16,9 @@
 </section>
 {{- end}}
 
-{{- range .Divisions}}
+{{- with .Standings}}
 <section>
-  <h2>{{.Title}}</h2>
+  <h2>Standings</h2>
   <table class="standings">
     <thead>
       <tr>
@@ -24,10 +32,10 @@
       </tr>
     </thead>
     <tbody>
-      {{- range .Teams}}
+      {{- range .}}
       <tr>
         <td class="rank">{{.Rank}}</td>
-        <td class="team">{{if .HasLogo}}<img class="logo" src="/logo/{{.Team.ID}}" alt="" width="22" height="22" loading="lazy">{{else}}<span class="logo"></span>{{end}}<a href="/team/{{.Team.ID}}">{{.Team.Title}}</a></td>
+        <td class="team">{{template "logo" .}}<a href="/team/{{.ID}}">{{.Name}}</a></td>
         <td>{{.GP}}</td><td>{{.W}}</td><td>{{.L}}</td><td>{{.T}}</td>
         <td class="pts">{{.PTS}}</td>
         <td class="wide">{{.GF}}</td><td class="wide">{{.GA}}</td>

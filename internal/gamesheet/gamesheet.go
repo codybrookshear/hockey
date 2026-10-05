@@ -72,15 +72,16 @@ type Team struct {
 
 // Game is one game, scheduled, live or final.
 type Game struct {
-	ID       int
-	Number   string
-	Start    time.Time
-	Status   string // "scheduled", "in_progress", "final"
-	Type     string // "regular_season", "playoff", "exhibition"
-	Location string
-	Division string // the home team's
-	Home     Side
-	Visitor  Side
+	ID         int
+	Number     string
+	Start      time.Time
+	Status     string // "scheduled", "in_progress", "final"
+	Type       string // "regular_season", "playoff", "exhibition"
+	Location   string
+	Division   string // the home team's
+	DivisionID int
+	Home       Side
+	Visitor    Side
 }
 
 func (g Game) Final() bool { return g.Status == "final" }
@@ -89,10 +90,11 @@ func (g Game) Live() bool  { return g.Status == "in_progress" }
 // Side is one team in a game.
 type Side struct {
 	Team
-	Goals   int
-	Result  string // "W", "L", or "" (tie, or not final)
-	Record  string // overall W-L-OTL-SOL, as of now
-	Scorers []Goal
+	Goals      int
+	Result     string // "W", "L", or "" (tie, or not final)
+	Record     string // overall W-L-OTL-SOL, as of now
+	DivisionID int
+	Scorers    []Goal
 }
 
 // TBD reports a playoff slot not yet filled.
@@ -287,6 +289,7 @@ type rawSide struct {
 	Result   string `json:"result"`
 	Record   string `json:"overallRecord"`
 	Division struct {
+		ID    int    `json:"id"`
 		Title string `json:"title"`
 	} `json:"division"`
 	GoalDetails []struct {
@@ -305,17 +308,18 @@ func (r rawGame) game() (Game, error) {
 	}
 	return Game{
 		ID: r.GameID, Number: r.Number, Start: start, Status: r.Status, Type: r.GameType,
-		Location: r.Location, Division: r.Home.Division.Title,
+		Location: r.Location, Division: r.Home.Division.Title, DivisionID: r.Home.Division.ID,
 		Home: r.Home.side(), Visitor: r.Visitor.side(),
 	}, nil
 }
 
 func (r rawSide) side() Side {
 	s := Side{
-		Team:   Team{ID: r.ID, Title: r.Title, Abbr: r.Abbr, Logo: r.Logo},
-		Goals:  *r.Goals,
-		Result: r.Result,
-		Record: r.Record,
+		Team:       Team{ID: r.ID, Title: r.Title, Abbr: r.Abbr, Logo: r.Logo},
+		Goals:      *r.Goals,
+		Result:     r.Result,
+		Record:     r.Record,
+		DivisionID: r.Division.ID,
 	}
 	for _, g := range r.GoalDetails {
 		s.Scorers = append(s.Scorers, Goal{

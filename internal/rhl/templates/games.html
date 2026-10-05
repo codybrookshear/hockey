@@ -1,6 +1,7 @@
 {{/* Shared pieces: a game card, and a team's logo and name. */}}
 
-{{define "logo"}}{{if .HasLogo}}<img class="logo" src="/logo/{{.ID}}" alt="" width="22" height="22" loading="lazy">{{else}}<span class="logo"></span>{{end}}{{end}}
+{{/* A team's logo; teams without one get their initial on a badge. Takes .ID, .Name, .HasLogo, .TBD. */}}
+{{define "logo"}}{{if .HasLogo}}<img class="logo" src="/logo/{{.ID}}" alt="" width="22" height="22" loading="lazy">{{else if .TBD}}<span class="logo"></span>{{else}}<span class="logo initial" aria-hidden="true">{{initial .Name}}</span>{{end}}{{end}}
 
 {{define "teamname"}}{{if .TBD}}<span class="tbd">TBD</span>{{else}}<a href="/team/{{.ID}}">{{.Name}}</a>{{end}}{{end}}
 

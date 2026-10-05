@@ -66,12 +66,14 @@ func run(log *slog.Logger) error {
 		CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("unexpected redirect") },
 	}
 	srv, err := rhl.New(rhl.Config{
-		Source:   &gamesheet.Client{HTTP: client, BaseURL: gamesheet.DefaultBaseURL, UserAgent: userAgent},
-		Season:   season,
-		League:   league,
-		Logo:     rhl.FetchLogo(client, userAgent),
-		Location: loc,
-		Log:      log,
+		Source: &gamesheet.Client{HTTP: client, BaseURL: gamesheet.DefaultBaseURL, UserAgent: userAgent},
+		Season: season,
+		League: league,
+		Logo:   rhl.FetchLogo(client, userAgent),
+		// On the socket, it's behind cloudflared: visitors use HTTPS.
+		SecureCookies: os.Getenv("RHL_SOCKET") != "",
+		Location:      loc,
+		Log:           log,
 	})
 	if err != nil {
 		return err

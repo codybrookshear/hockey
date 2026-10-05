@@ -10,6 +10,7 @@
   --warn-bg: #fef3c7;
   --warn-fg: #92400e;
   --radius: 10px;
+  --brand: #b91c1c;    /* fills behind white text (badges, the selected division), both themes */
   color-scheme: light dark;
 }
 
@@ -98,6 +99,42 @@ h3 {
   object-fit: contain;
   vertical-align: middle;
 }
+
+/* A team without a logo: its initial, white on red. */
+.logo.initial {
+  display: inline-grid;
+  place-items: center;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+  border-radius: 5px;
+}
+.logo.big.initial { font-size: 1.9rem; border-radius: 12px; }
+
+/* Division toggle: a segmented control, one equal part per division. */
+.divisions {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 3px;
+  margin: 0.8rem 0 0;
+  padding: 3px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.divisions a {
+  padding: 0.5rem 0.5rem;
+  text-align: center;
+  font-weight: 700;
+  color: var(--muted);
+  border-radius: 999px;
+}
+
+.divisions a[aria-current="page"] { background: var(--brand); color: #fff; }
 
 /* Standings and stats tables: fit a 375px phone; extra columns (.wide) join
    on wider screens. */

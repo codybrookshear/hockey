@@ -3,8 +3,10 @@
 - `hockey.brookshear.party` (`cmd/schedule`, `internal/schedule`): The Rink Exchange's daily
   schedule from Frontline Connect (HTML, no API; `internal/frontline`), one table per sheet.
 - `rhl.brookshear.party` (`cmd/rhl`, `internal/rhl`): the RHL adult league from GameSheet's
-  undocumented JSON API (`internal/gamesheet`): standings, results with scorers, upcoming,
-  scoring leaders, goalies, team pages with player stats, logos (server-cached).
+  undocumented JSON API (`internal/gamesheet`): a division toggle (remembered in a cookie)
+  filters standings, live, results with scorers, upcoming, scoring leaders and goalies; team
+  pages (unfiltered) with player stats; logos (server-cached; teams without one get their
+  initial, white on red).
 
 Separate apps and containers by design (the user wants them separate sites). Shared:
 `internal/cache` (cache + per-source request limits) and `internal/serve` (listen, timeouts,
@@ -13,7 +15,9 @@ Phone-first (iPhone mini, 375px): check layouts at that width.
 
 ## Architecture (decided)
 - Go, server-rendered `net/http` + `html/template`. No JavaScript, no third-party assets in
-  pages (logos are proxied), strict CSP. No database, no secrets, no login. Public.
+  pages (logos are proxied), strict CSP. No database, no secrets, no login. Public. One
+  cookie: RHL's `division` (an ID; HttpOnly, Lax, Secure when on the socket), set by the
+  toggle's `/?division=<id>` links.
 - Parse strictly; fail loudly on a changed source (missing fields/columns, wrong date
   heading, bad times) rather than show a wrong or empty table. Tests use saved responses
   (testdata/). Send an honest User-Agent; never impersonate a browser or get past bot

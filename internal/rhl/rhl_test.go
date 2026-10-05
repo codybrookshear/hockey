@@ -173,26 +173,35 @@ func TestHome(t *testing.T) {
 	body := w.Body.String()
 	for _, want := range []string{
 		"<title>RHL · Fall 2026</title>",
-		"<h2>A/B Division</h2>", "<h2>B/C Division</h2>",
-		`<a href="/team/554802">Ice Dogs</a>`,
-		`<img class="logo" src="/logo/554802"`,
+		// The toggle, on the first division by default.
+		`<a href="/?division=82591" aria-current="page">A/B Division</a>`,
+		`<a href="/?division=82590">B/C Division</a>`,
+		"<h2>Standings</h2>",
+		`<a href="/team/554805">Pirates</a>`,
+		`<img class="logo" src="/logo/554805"`,
+		`<span class="logo initial" aria-hidden="true">R</span>`, // Rogue has no logo
 		"<h2>Results</h2>", "<h2>Upcoming</h2>", "<h2>Live</h2>",
 		"<h2>Scoring leaders</h2>", "<h2>Goalies</h2>",
 		"Earlier results", "Later games",
 		`<td class="who">Derek Dusome <a class="abbr" href="/team/554805">PIR</a></td>`, // from "DEREK DUSOME"
 		`<td class="pts">17</td>`,
-		`<td class="pts">.935</td>`,    // the best save percentage first
+		`<td class="pts">.902</td>`,    // the division's best save percentage first
 		`<span class="tbd">TBD</span>`, // playoff slots
 		`<span class="kind">Playoff</span>`,
-		"Final · Tie",
 		"https://gamesheetstats.com/seasons/15331",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("home lacks %q", want)
 		}
 	}
-	if strings.Index(body, "A/B Division") > strings.Index(body, "B/C Division") {
-		t.Error("divisions out of order")
+	// Nothing from the other division.
+	for _, other := range []string{"Ice Dogs", "sky guardians", ".935"} {
+		if strings.Contains(body, other) {
+			t.Errorf("A/B page shows %q, from B/C", other)
+		}
+	}
+	if c := w.Header().Get("Set-Cookie"); c != "" {
+		t.Errorf("set a cookie without a choice: %q", c)
 	}
 	// Ranked: Renegades (3rd) before Pirates (4th), though the response lists them the other way round.
 	if strings.Index(body, ">Renegades</a></td>") > strings.Index(body, ">Pirates</a></td>") {
@@ -316,7 +325,8 @@ func TestGameSheetDown(t *testing.T) {
 	w = get(t, h, "/")
 	body := w.Body.String()
 	if w.Code != http.StatusOK || !strings.Contains(body, "get the standings") ||
-		!strings.Contains(body, "<h2>Results</h2>") || strings.Contains(body, "<h2>A/B Division</h2>") {
+		!strings.Contains(body, "<h2>Results</h2>") || strings.Contains(body, "<h2>Standings</h2>") ||
+		!strings.Contains(body, `href="/?division=82590"`) { // divisions from the games
 		t.Errorf("standings down: %d", w.Code)
 	}
 	// Player stats down too: the rest still shows.
@@ -386,12 +396,17 @@ func TestScorersRosterGoalies(t *testing.T) {
 		add(fmt.Sprint("DEPTH", i), line(1, 1, 0), team(2, "TWO", line(1, 1, 0)))
 	}
 
-	got := scorers(all)
+	everyone := func(int) bool { return true }
+	got := scorers(all, everyone)
 	// STAR and SUB tie on points; STAR has more goals. Then 14 tied at 1:
 	// cut at scorersMax.
 	if got[0].Name != "A Star" || got[1].Name != "A Sub" || got[1].Rank != 1 || got[1].Team != "ONE/TWO" ||
 		got[2].Rank != 3 || len(got) != scorersMax {
 		t.Errorf("scorers: %+v", got[:3])
+	}
+	// A division of team 2 only: SUB counts their games for TWO.
+	if two := scorers(all, func(id int) bool { return id == 2 }); two[0].Name != "A Sub" || two[0].PTS != 4 || two[0].Team != "TWO" {
+		t.Errorf("division scorers: %+v", two[0])
 	}
 	one := roster(all, 1)
 	// SUB's stats for this team only; OLD (no games) left out.
@@ -408,10 +423,62 @@ func TestScorersRosterGoalies(t *testing.T) {
 		{Player: gamesheet.Player{First: "c", Last: "bench"},
 			Teams: []gamesheet.GoalieTeam{{Team: gamesheet.Team{ID: 1, Abbr: "ONE"}}}},
 	}
-	if g := goalies(gl, 0); len(g) != 2 || g[0].Name != "B Best" || g[1].SVPct != .9 || g[1].Team != "ONE" {
-		t.Errorf("league goalies (season totals, once each, no benchwarmers): %+v", g)
+	// A row per goalie and team they played for; none for the benchwarmer.
+	if g := goalies(gl, everyone, true); len(g) != 3 || g[0].SVPct != .95 || g[0].Team != "ONE" || g[1].Name != "B Best" || g[2].Team != "TWO" {
+		t.Errorf("league goalies: %+v", g)
 	}
-	if g := goalies(gl, 1); len(g) != 1 || g[0].SVPct != .95 || g[0].Team != "" {
+	if g := goalies(gl, func(id int) bool { return id == 1 }, false); len(g) != 1 || g[0].SVPct != .95 || g[0].Team != "" {
 		t.Errorf("team goalies (that team's line, no team label): %+v", g)
+	}
+}
+
+func TestDivisionToggle(t *testing.T) {
+	src := savedGameSheet(t)
+	h := newServer(t, Config{Source: src, Season: 15331})
+	bc := func(body string) bool {
+		return strings.Contains(body, `<a href="/?division=82590" aria-current="page">B/C Division</a>`) &&
+			strings.Contains(body, `<a href="/team/554802">Ice Dogs</a>`) && !strings.Contains(body, "Pirates") &&
+			strings.Contains(body, `<td class="pts">.935</td>`) && // Dorman, B/C's best
+			strings.Contains(body, "Final · Tie") // Bestmed 2, Ice Dogs 2
+	}
+
+	// Picking B/C shows it and remembers it.
+	w := get(t, h, "/?division=82590")
+	if !bc(w.Body.String()) {
+		t.Errorf("?division=82590 doesn't show B/C only:\n%s", w.Body)
+	}
+	c := w.Result().Cookies()
+	if len(c) != 1 || c[0].Name != "division" || c[0].Value != "82590" || !c[0].HttpOnly || c[0].Secure ||
+		c[0].SameSite != http.SameSiteLaxMode || c[0].Path != "/" || c[0].MaxAge < 300*24*60*60 {
+		t.Fatalf("cookie: %+v", c)
+	}
+
+	withCookie := func(target, value string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodGet, target, nil)
+		r.AddCookie(&http.Cookie{Name: "division", Value: value})
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	// Remembered: plain / shows B/C, without setting the cookie again.
+	if w := withCookie("/", "82590"); !bc(w.Body.String()) || w.Header().Get("Set-Cookie") != "" {
+		t.Error("the remembered division isn't used")
+	}
+	// An unknown division is ignored, in the link or the cookie.
+	if w := withCookie("/?division=999", "82590"); !bc(w.Body.String()) || w.Header().Get("Set-Cookie") != "" {
+		t.Error("?division=999 overrode the cookie, or was remembered")
+	}
+	if w := withCookie("/", "garbage"); !strings.Contains(w.Body.String(), `aria-current="page">A/B Division`) {
+		t.Error("a bad cookie didn't fall back to the first division")
+	}
+	// Team pages aren't filtered.
+	if w := withCookie("/team/554805", "82590"); !strings.Contains(w.Body.String(), "<h1>Pirates</h1>") {
+		t.Error("team page filtered by division")
+	}
+
+	// In production the cookie is Secure.
+	h = newServer(t, Config{Source: savedGameSheet(t), Season: 15331, SecureCookies: true})
+	if c := get(t, h, "/?division=82590").Result().Cookies(); len(c) != 1 || !c[0].Secure {
+		t.Errorf("production cookie: %+v", c)
 	}
 }

@@ -7,8 +7,9 @@ to work well on a phone:
   daily schedule. One table for the Big Sheet, one for the Mini Sheet, with
   times, teams and locker rooms. (`cmd/schedule`, `internal/schedule`)
 - **[rhl.brookshear.party](https://rhl.brookshear.party)**: the RHL (adult
-  league). Standings by division, results with goal scorers, upcoming games,
-  scoring leaders, goalies, and a page per team with its players' stats.
+  league). Pick a division at the top (remembered); standings, results with
+  goal scorers, upcoming games, scoring leaders and goalies follow it. A page
+  per team with its players' stats.
   (`cmd/rhl`, `internal/rhl`)
 
 They're separate apps in separate containers. What they share: the cache and
@@ -38,7 +39,9 @@ is down, the last copy is shown, marked as old.
 
 ## Privacy and security
 
-Public: no login, no cookies, no JavaScript, strict CSP. Team logos are
+Public: no login, no JavaScript, strict CSP. The only cookie is the RHL
+site's remembered division (its ID; HttpOnly, SameSite=Lax, Secure in
+production). Team logos are
 fetched by the server from GameSheet's image CDN and served from the site, so
 visitors' browsers only ever talk to these sites. `noindex`, and robots.txt
 disallows everything, like the sources' own.

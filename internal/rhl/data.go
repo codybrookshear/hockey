@@ -28,8 +28,9 @@ type page struct {
 
 type homeData struct {
 	page
+	Divisions []divisionTab // the toggle: empty with fewer than two divisions
+	Standings []standing    // the selected division's
 	Live      []game
-	Divisions []division
 	Upcoming  []day
 	Later     []day // upcoming, after the first few days
 	Results   []day
@@ -51,14 +52,25 @@ type teamData struct {
 	Goalies  []goalie
 }
 
-type division struct {
+type divisionTab struct {
+	ID       int
+	Title    string
+	Selected bool
+}
+
+// divisionRef is a division in the season: from the standings, or the games
+// when standings are unavailable.
+type divisionRef struct {
+	ID    int
 	Title string
-	Teams []standing
 }
 
 type standing struct {
 	gamesheet.Standing
+	ID      int // the team's; ID, Name, HasLogo and TBD as on a game's side, for the logo template
+	Name    string
 	HasLogo bool
+	TBD     bool
 }
 
 type day struct {
@@ -126,19 +138,68 @@ func (s *Server) pageData(st stats) page {
 	return p
 }
 
-func (s *Server) homeData(st stats) homeData {
-	d := homeData{page: s.pageData(st)}
-	for _, div := range st.Divisions {
-		out := division{Title: div.Title}
-		for _, t := range div.Teams {
-			out.Teams = append(out.Teams, standing{Standing: t, HasLogo: s.hasLogo(t.Team.ID)})
+// divisionsOf lists the season's divisions, by title.
+func divisionsOf(st stats) []divisionRef {
+	var out []divisionRef
+	add := func(id int, title string) {
+		if id != 0 && !slices.ContainsFunc(out, func(d divisionRef) bool { return d.ID == id }) {
+			out = append(out, divisionRef{ID: id, Title: title})
 		}
-		d.Divisions = append(d.Divisions, out)
 	}
-	slices.SortFunc(d.Divisions, func(a, b division) int { return cmp.Compare(a.Title, b.Title) })
+	for _, d := range st.Divisions {
+		add(d.ID, d.Title)
+	}
+	for _, g := range st.Games {
+		add(g.DivisionID, g.Division)
+	}
+	slices.SortFunc(out, func(a, b divisionRef) int { return cmp.Compare(a.Title, b.Title) })
+	return out
+}
+
+// pickDivision returns want if the season has it, else the first division
+// (0 when there are none: nothing is filtered).
+func pickDivision(divs []divisionRef, want int) int {
+	if slices.ContainsFunc(divs, func(d divisionRef) bool { return d.ID == want }) {
+		return want
+	}
+	if len(divs) > 0 {
+		return divs[0].ID
+	}
+	return 0
+}
+
+// homeData is the home page for one division (0: all).
+func (s *Server) homeData(st stats, div int) homeData {
+	d := homeData{page: s.pageData(st)}
+	if divs := divisionsOf(st); len(divs) > 1 {
+		for _, ref := range divs {
+			d.Divisions = append(d.Divisions, divisionTab{ID: ref.ID, Title: ref.Title, Selected: ref.ID == div})
+		}
+	}
+	// The division's teams, to pick out their players.
+	teams := map[int]bool{}
+	for _, dv := range st.Divisions {
+		if div != 0 && dv.ID != div {
+			continue
+		}
+		for _, t := range dv.Teams {
+			teams[t.Team.ID] = true
+			d.Standings = append(d.Standings, standing{
+				Standing: t, ID: t.Team.ID, Name: t.Team.Title, HasLogo: s.hasLogo(t.Team.ID),
+			})
+		}
+	}
 
 	var upcoming, finals []game
 	for _, g := range st.Games {
+		if div != 0 && g.DivisionID != div && g.Home.DivisionID != div && g.Visitor.DivisionID != div {
+			continue
+		}
+		for _, sd := range []gamesheet.Side{g.Home, g.Visitor} {
+			if sd.ID != 0 && (div == 0 || sd.DivisionID == div) {
+				teams[sd.ID] = true
+			}
+		}
 		switch row := s.game(g); {
 		case g.Live():
 			d.Live = append(d.Live, row)
@@ -151,8 +212,9 @@ func (s *Server) homeData(st stats) homeData {
 	slices.Reverse(finals) // games come oldest first
 	d.Upcoming, d.Later = split(s.days(upcoming))
 	d.Results, d.Earlier = split(s.days(finals))
-	d.Scorers = scorers(st.Skaters)
-	d.Goalies = goalies(st.Goalies, 0)
+	inDivision := func(team int) bool { return div == 0 || teams[team] }
+	d.Scorers = scorers(st.Skaters, inDivision)
+	d.Goalies = goalies(st.Goalies, inDivision, true)
 	return d
 }
 
@@ -192,7 +254,7 @@ func (s *Server) teamData(st stats, id int) (teamData, bool) {
 	}
 	slices.Reverse(d.Results)
 	d.Skaters = roster(st.Skaters, id)
-	d.Goalies = goalies(st.Goalies, id)
+	d.Goalies = goalies(st.Goalies, func(team int) bool { return team == id }, false)
 	return d, found
 }
 
@@ -265,23 +327,32 @@ func split(days []day) (first, rest []day) {
 	return days[:daysShown], days[daysShown:]
 }
 
-// scorers is the league's scoring leaders: by points, then goals, then
-// fewer games; ranks shared by ties on points.
-func scorers(all []gamesheet.Skater) []skater {
+// scorers is the scoring leaders among the teams include accepts (a
+// division's): by points, then goals, then fewer games; ranks shared by ties
+// on points. A sub counts only their games for those teams.
+func scorers(all []gamesheet.Skater, include func(team int) bool) []skater {
 	var out []skater
 	for _, s := range all {
-		if s.GP == 0 || s.PTS == 0 {
-			continue
-		}
-		row := skater{Name: playerName(s.Player), GP: s.GP, G: s.G, A: s.A, PTS: s.PTS, PIM: s.PIM}
+		row := skater{Name: playerName(s.Player)}
 		var abbrs []string
 		for _, t := range s.Teams {
-			if t.GP > 0 && !slices.Contains(abbrs, t.Abbr) {
-				abbrs = append(abbrs, t.Abbr)
-				if row.TeamID == 0 {
-					row.TeamID = t.ID
-				}
+			if t.GP == 0 || !include(t.ID) {
+				continue
 			}
+			row.GP += t.GP
+			row.G += t.G
+			row.A += t.A
+			row.PTS += t.PTS
+			row.PIM += t.PIM
+			if !slices.Contains(abbrs, t.Abbr) {
+				abbrs = append(abbrs, t.Abbr)
+			}
+			if row.TeamID == 0 {
+				row.TeamID = t.ID
+			}
+		}
+		if row.PTS == 0 {
+			continue
 		}
 		row.Team = strings.Join(abbrs, "/")
 		out = append(out, row)
@@ -337,30 +408,23 @@ func roster(all []gamesheet.Skater, team int) []skater {
 	return out
 }
 
-// goalies is the goalies with games, for one team (or all, team 0), best
-// save percentage first.
-func goalies(all []gamesheet.Goalie, team int) []goalie {
+// goalies is a row per goalie and team, for the teams include accepts, with
+// games; best save percentage first. showTeam labels each row with its team.
+func goalies(all []gamesheet.Goalie, include func(team int) bool, showTeam bool) []goalie {
 	var out []goalie
 	for _, g := range all {
 		for _, t := range g.Teams {
-			if t.GP == 0 || (team != 0 && t.ID != team) {
+			if t.GP == 0 || !include(t.ID) {
 				continue
-			}
-			line := t.GoalieLine
-			if team == 0 && len(g.Teams) > 1 {
-				line = g.GoalieLine // league table: the season, whichever teams
 			}
 			row := goalie{
 				Name: playerName(g.Player),
-				GP:   line.GP, W: line.W, L: line.L, T: line.T, SO: line.SO, GAA: line.GAA, SVPct: line.SVPct,
+				GP:   t.GP, W: t.W, L: t.L, T: t.T, SO: t.SO, GAA: t.GAA, SVPct: t.SVPct,
 			}
-			if team == 0 {
+			if showTeam {
 				row.TeamID, row.Team = t.ID, t.Abbr
 			}
 			out = append(out, row)
-			if team == 0 {
-				break // once per goalie
-			}
 		}
 	}
 	slices.SortStableFunc(out, func(a, b goalie) int {
@@ -453,5 +517,12 @@ func (s *Server) funcs() template.FuncMap {
 		// .901, the way save percentage is written
 		"svpct": func(f float64) string { return strings.TrimPrefix(fmt.Sprintf("%.3f", f), "0") },
 		"gaa":   func(f float64) string { return fmt.Sprintf("%.2f", f) },
+		// A badge for teams without a logo: their initial.
+		"initial": func(name string) string {
+			for _, r := range name {
+				return string(unicode.ToUpper(r))
+			}
+			return ""
+		},
 	}
 }

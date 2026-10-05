@@ -1,6 +1,7 @@
 // Package rhl serves rhl.brookshear.party: the RHL (The Rink Exchange's adult
 // league) standings, results, upcoming games, scoring leaders, goalies and
-// team pages, from GameSheet. Public: no login, no cookies, no scripts.
+// team pages, from GameSheet, one division at a time. Public: no login, no
+// scripts; one cookie, remembering the division picked.
 package rhl
 
 import (
@@ -45,13 +46,17 @@ const (
 )
 
 type Config struct {
-	Source   Source
-	Season   int // the GameSheet season to show; 0 = League's current one
-	League   int // the GameSheet league
-	Logo     func(ctx context.Context, url string) (Logo, error)
-	Location *time.Location
-	Log      *slog.Logger
-	Now      func() time.Time // nil = time.Now
+	Source Source
+	Season int // the GameSheet season to show; 0 = League's current one
+	League int // the GameSheet league
+	Logo   func(ctx context.Context, url string) (Logo, error)
+	// SecureCookies marks the division cookie Secure: in production, where
+	// visitors arrive over HTTPS (through Cloudflare), not on a dev box's
+	// plain HTTP.
+	SecureCookies bool
+	Location      *time.Location
+	Log           *slog.Logger
+	Now           func() time.Time // nil = time.Now
 }
 
 type Server struct {
@@ -206,13 +211,31 @@ func (s *Server) render(w http.ResponseWriter, page string, status int, data any
 	w.Write(buf.Bytes())
 }
 
+// divisionCookie remembers the division a visitor picked: its GameSheet ID,
+// nothing else. The site has no scripts, so a cookie is how it remembers.
+const divisionCookie = "division"
+
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	st := s.load(r.Context())
 	status := http.StatusOK
 	if st.Fatal || (st.Divisions == nil && st.Games == nil) {
 		status = http.StatusBadGateway
 	}
-	s.render(w, "home", status, s.homeData(st))
+
+	// The toggle links to /?division=<id>: show it and remember it. Otherwise
+	// the remembered one, or the first.
+	divs := divisionsOf(st)
+	div := 0
+	if id, err := strconv.Atoi(r.URL.Query().Get("division")); err == nil && pickDivision(divs, id) == id {
+		div = id
+		http.SetCookie(w, &http.Cookie{
+			Name: divisionCookie, Value: strconv.Itoa(id), Path: "/",
+			MaxAge: 400 * 24 * 60 * 60, HttpOnly: true, Secure: s.cfg.SecureCookies, SameSite: http.SameSiteLaxMode,
+		})
+	} else if c, err := r.Cookie(divisionCookie); err == nil {
+		div, _ = strconv.Atoi(c.Value)
+	}
+	s.render(w, "home", status, s.homeData(st, pickDivision(divs, div)))
 }
 
 func (s *Server) team(w http.ResponseWriter, r *http.Request) {

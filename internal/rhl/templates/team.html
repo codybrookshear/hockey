@@ -3,7 +3,7 @@
 {{define "content"}}
 {{- if .Team.ID}}
 <section class="team-head">
-  {{if .HasLogo}}<img class="logo big" src="/logo/{{.Team.ID}}" alt="" width="56" height="56">{{end}}
+  {{if .HasLogo}}<img class="logo big" src="/logo/{{.Team.ID}}" alt="" width="56" height="56">{{else}}<span class="logo big initial" aria-hidden="true">{{initial .Team.Title}}</span>{{end}}
   <div>
     <h1>{{.Team.Title}}</h1>
     <p class="sub">{{with .Standing}}{{ordinal .Rank}} in the {{end}}{{.Division}}</p>
