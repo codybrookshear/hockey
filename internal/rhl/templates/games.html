@@ -1,0 +1,56 @@
+{{/* Shared pieces: a game card, and a team's logo and name. */}}
+
+{{define "logo"}}{{if .HasLogo}}<img class="logo" src="/logo/{{.ID}}" alt="" width="22" height="22" loading="lazy">{{else}}<span class="logo"></span>{{end}}{{end}}
+
+{{define "teamname"}}{{if .TBD}}<span class="tbd">TBD</span>{{else}}<a href="/team/{{.ID}}">{{.Name}}</a>{{end}}{{end}}
+
+{{/* A final with goals opens to show the scorers; anything else is a plain card. */}}
+{{define "game"}}
+{{- if .Goals}}
+<details class="game">
+  <summary>{{template "board" .}}</summary>
+  <ol class="goals">
+    {{- range .Goals}}
+    <li><span class="when">{{.Period}} · {{.Clock}}</span><span class="who">{{.Name}}</span><span class="abbr">{{.Team}}</span></li>
+    {{- end}}
+  </ol>
+</details>
+{{- else}}
+<div class="game">{{template "board" .}}</div>
+{{- end}}
+{{end}}
+
+{{define "board"}}
+<div class="board{{if .Live}} is-live{{end}}">
+  <div class="sides">
+    {{- range $s := (list .Visitor .Home)}}
+    <div class="side{{if $s.Won}} won{{end}}">
+      {{template "logo" $s}}<span class="name">{{template "teamname" $s}}</span>
+      {{- if or $.Final $.Live}}<span class="score">{{$s.Goals}}</span>{{end}}
+    </div>
+    {{- end}}
+  </div>
+  <div class="meta">
+    {{- if .ShowDay}}<span>{{.Day}}</span>{{end}}
+    {{- if .Live}}<span class="live">Live</span>
+    {{- else if .Final}}<span>Final{{if .Tie}} · Tie{{end}}</span>
+    {{- else}}<span class="time">{{.Time}}</span>{{end}}
+    {{- with .Kind}}<span class="kind">{{.}}</span>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{define "days"}}
+{{- range .}}
+<h3>{{.Label}}</h3>
+{{- range .Games}}{{template "game" .}}{{end}}
+{{- end}}
+{{end}}
+
+{{define "leaders"}}
+<ol class="leaders">
+  {{- range .}}
+  <li><span class="rank">{{.Rank}}</span><span class="who">{{.Name}}{{if .Team}}<a class="abbr" href="/team/{{.TeamID}}">{{.Team}}</a>{{end}}</span><span class="n">{{.Goals}}</span></li>
+  {{- end}}
+</ol>
+{{end}}

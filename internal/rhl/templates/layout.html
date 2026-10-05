@@ -1,0 +1,33 @@
+{{define "layout.html" -}}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>{{block "title" .}}RHL{{end}}</title>
+<link rel="icon" href="{{asset "icon.svg"}}" type="image/svg+xml">
+<link rel="apple-touch-icon" href="{{asset "icon-180.png"}}">
+<meta name="apple-mobile-web-app-title" content="RHL">
+<meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1120" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="{{asset "rhl.css"}}">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">RHL</a>
+  {{with .Season.Name}}<span class="season">{{.}}</span>{{end}}
+</header>
+<main>
+{{range .Problems}}<p class="problem">{{.}}</p>{{end}}
+{{if .Stale}}<p class="problem">Couldn't reach GameSheet. These are the stats as of {{stamp .Fetched}}.</p>{{end}}
+{{template "content" .}}
+</main>
+<footer>
+  {{if .Source}}Stats from <a href="{{.Source}}" rel="noreferrer">GameSheet</a>{{if not .Fetched.IsZero}}, updated {{stamp .Fetched}}{{end}}.{{end}}
+</footer>
+</body>
+</html>
+{{- end}}

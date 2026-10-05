@@ -1,4 +1,4 @@
-# The hockey container's socket directory, recreated at every boot (/run is
+# The schedule container's socket directory, recreated at every boot (/run is
 # RAM). Owned by the container's user (distroless nonroot, uid 65532); 0711 so
 # cloudflared can reach the socket inside without listing the directory.
 # Installed as /etc/tmpfiles.d/hockey-web.conf.

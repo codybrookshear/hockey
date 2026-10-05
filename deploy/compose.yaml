@@ -1,32 +1,49 @@
 # Production, on the droplet: scripts/deploy-install.sh installs it as
-# /opt/hockey/compose.yaml. The image is built on the workstation and loaded
+# /opt/hockey/compose.yaml. Images are built on the workstation and loaded
 # over SSH by scripts/deploy.sh, so nothing is built or pulled here.
 #
-# Its own Compose project (hockey), apart from the finance app on the same
-# droplet: its only network is its own, so it can reach the internet (the
-# rink's site) but none of finance's containers. No secrets, no volumes but
-# the socket directory.
+# Compose project "hockey", apart from the finance app on the same droplet.
+# Two independent apps, each on its own network: they can reach the internet
+# (the sites they read) but not each other or any of finance's containers.
+# No secrets, no volumes but each one's socket directory.
+
+x-app: &app
+  pull_policy: never
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+  # Public sites on a shared droplet: a flood of requests can't starve the rest.
+  mem_limit: 128m
+  cpus: 0.5
+  pids_limit: 64
 
 services:
-  web:
-    image: hockey:${HOCKEY_VERSION:?}
-    pull_policy: never
-    read_only: true
-    cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
-    restart: unless-stopped
+  # hockey.brookshear.party: the rink's daily schedule.
+  schedule:
+    <<: *app
+    image: hockey-schedule:${SCHEDULE_VERSION:?}
     environment:
-      # A Unix socket in /run/hockey-web (host) for cloudflared; no published port.
-      HOCKEY_SOCKET: /run/web/web.sock
+      SCHEDULE_SOCKET: /run/web/web.sock   # /run/hockey-web on the host, for cloudflared
       HOCKEY_TZ: America/Los_Angeles
       GOMEMLIMIT: 100MiB
     volumes:
       - /run/hockey-web:/run/web
-    networks: [egress]
-    # Public site on a shared droplet: a flood of requests can't starve the rest.
-    mem_limit: 128m
-    cpus: 0.5
-    pids_limit: 64
+    networks: [schedule]
+
+  # rhl.brookshear.party: the RHL's standings and games, from GameSheet.
+  rhl:
+    <<: *app
+    image: hockey-rhl:${RHL_VERSION:?}
+    environment:
+      RHL_SOCKET: /run/web/web.sock        # /run/rhl-web on the host, for cloudflared
+      HOCKEY_TZ: America/Los_Angeles
+      GOMEMLIMIT: 100MiB
+      # RHL_SEASON: "15331"   # pin a GameSheet season instead of finding the current one
+    volumes:
+      - /run/rhl-web:/run/web
+    networks: [rhl]
 
 networks:
-  egress: {}
+  schedule: {}
+  rhl: {}

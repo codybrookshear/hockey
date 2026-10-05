@@ -1,0 +1,47 @@
+{{define "title"}}{{with .Team.Title}}{{.}} · {{end}}RHL{{end}}
+
+{{define "content"}}
+{{- if .Team.ID}}
+<section class="team-head">
+  {{if .HasLogo}}<img class="logo big" src="/logo/{{.Team.ID}}" alt="" width="56" height="56">{{end}}
+  <div>
+    <h1>{{.Team.Title}}</h1>
+    <p class="sub">{{with .Standing}}{{ordinal .Rank}} in the {{end}}{{.Division}}</p>
+  </div>
+</section>
+
+{{- with .Standing}}
+<dl class="tiles">
+  <div><dt>W-L-T</dt><dd>{{.W}}-{{.L}}-{{.T}}</dd></div>
+  <div><dt>Points</dt><dd>{{.PTS}}</dd></div>
+  <div><dt>Goals</dt><dd>{{.GF}}–{{.GA}}</dd></div>
+  <div><dt>Streak</dt><dd>{{or .Streak "–"}}</dd></div>
+</dl>
+{{- end}}
+
+{{- with .Live}}
+<section>
+  <h2>Live</h2>
+  {{- range .}}{{template "game" .}}{{end}}
+</section>
+{{- end}}
+
+<section>
+  <h2>Results</h2>
+  {{- range .Results}}{{template "game" .}}{{else}}<p class="empty">No games played yet.</p>{{end}}
+</section>
+
+<section>
+  <h2>Upcoming</h2>
+  {{- range .Upcoming}}{{template "game" .}}{{else}}<p class="empty">No more games scheduled.</p>{{end}}
+</section>
+
+{{- with .Scorers}}
+<section>
+  <h2>Goal scorers</h2>
+  {{template "leaders" .}}
+</section>
+{{- end}}
+{{- end}}
+<p class="back"><a href="/">‹ Standings</a></p>
+{{end}}

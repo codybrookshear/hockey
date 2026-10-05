@@ -1,4 +1,4 @@
-package site
+package schedule
 
 import (
 	"context"
@@ -293,48 +293,5 @@ func TestGroupKeepsUnknownSurfaces(t *testing.T) {
 	}
 	if r := got[1].Rows[0]; !r.Same || r.Home.Locker != "9, 10" {
 		t.Errorf("both lockers on a single event: %+v", r)
-	}
-}
-
-// leavingSource: the visitor gives up during the first fetch.
-type leavingSource struct {
-	fakeSource
-	cancel context.CancelFunc
-}
-
-func (l *leavingSource) Day(ctx context.Context, d time.Time) ([]frontline.Event, error) {
-	if l.cancel != nil {
-		l.cancel()
-		l.cancel = nil
-		l.mu.Lock()
-		l.calls++
-		l.mu.Unlock()
-		return nil, ctx.Err()
-	}
-	return l.fakeSource.Day(ctx, d)
-}
-
-func TestVisitorLeavingIsNotAFailure(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	src := &leavingSource{cancel: cancel}
-	s := newSchedules(src, newClock(at1130(4)).now)
-	d := time.Date(2026, 10, 4, 0, 0, 0, 0, la)
-	if r := s.get(ctx, d); r.Err == nil {
-		t.Fatal("no error")
-	}
-	// The next visitor fetches right away rather than waiting out retryAfter.
-	if r := s.get(context.Background(), d); r.Err != nil || len(r.Events) == 0 || src.count() != 2 {
-		t.Errorf("next visitor: err=%v events=%d calls=%d", r.Err, len(r.Events), src.count())
-	}
-}
-
-func TestPruneForgetsOldDays(t *testing.T) {
-	c := newClock(at1130(4))
-	s := newSchedules(&fakeSource{}, c.now)
-	s.get(context.Background(), time.Date(2026, 10, 4, 0, 0, 0, 0, la))
-	c.add(25 * time.Hour)
-	s.get(context.Background(), time.Date(2026, 10, 5, 0, 0, 0, 0, la))
-	if len(s.days) != 1 {
-		t.Errorf("%d days cached, want 1", len(s.days))
 	}
 }

@@ -1,53 +1,82 @@
 # hockey
 
-The Rink Exchange's daily schedule (Lane County Ice, Eugene) on a page that
-works on a phone: one table for the Big Sheet, one for the Mini Sheet, with
-times, teams and locker rooms. Runs at `hockey.brookshear.party`.
+Two small public sites for The Rink Exchange (Lane County Ice, Eugene), built
+to work well on a phone:
 
-## How it works
+- **[hockey.brookshear.party](https://hockey.brookshear.party)**: the rink's
+  daily schedule. One table for the Big Sheet, one for the Mini Sheet, with
+  times, teams and locker rooms. (`cmd/schedule`, `internal/schedule`)
+- **[rhl.brookshear.party](https://rhl.brookshear.party)**: the RHL (adult
+  league). Standings by division, results with goal scorers, upcoming games,
+  goal leaders and a page per team. (`cmd/rhl`, `internal/rhl`)
 
-The rink's booking site, [Frontline Connect](https://www.frontline-connect.com/dailysched.cfm?fac=laneice&facid=1),
-has no API. Its daily schedule page is server-rendered HTML, so the site
-fetches that page (a form POST picks the date) and parses its table
-(`internal/frontline`). If the page changes shape, it shows an error instead
-of a wrong schedule.
+They're separate apps in separate containers. What they share: the cache and
+request limits (`internal/cache`) and server plumbing (`internal/serve`).
 
-- Each day is cached for 10 minutes. At most 20 requests a minute go to the
-  rink's site, one at a time, whatever the traffic. If the rink's site is down,
-  the last copy is shown, marked as old.
-- Dates from 7 days back to 120 days ahead.
-- Public: no login, no cookies, no JavaScript, strict CSP. `noindex`, and
-  robots.txt disallows everything, like the rink's own.
+## Where the data comes from
+
+Neither source has a public API.
+
+- **Schedule:** the rink's booking site,
+  [Frontline Connect](https://www.frontline-connect.com/dailysched.cfm?fac=laneice&facid=1),
+  renders its daily schedule as HTML. The app fetches that page (a form POST
+  picks the date) and parses its table (`internal/frontline`).
+- **RHL:** the league keeps score with [GameSheet](https://gamesheetstats.com).
+  Its stats site loads JSON from `gamesheetstats.com/api/…` (season info,
+  standings, games), unauthenticated and undocumented; the app reads the same
+  (`internal/gamesheet`). The current season is found automatically: the
+  rink's [standings page](https://www.therinkexchange.com/standings--stats.html)
+  links to the league's seasons, and GameSheet says which is active.
+  `RHL_SEASON` pins one instead.
+
+Both are parsed strictly: if a page or response changes shape, the site shows
+an error instead of a wrong table. Tests run against saved copies.
+
+Both sites send each source at most 20 requests a minute, one at a time, and
+cache answers (schedule days 10 minutes; RHL stats 3 minutes; team logos a
+day), whatever their own traffic. If a source is down, the last copy is shown,
+marked as old.
+
+## Privacy and security
+
+Public: no login, no cookies, no JavaScript, strict CSP. Team logos are
+fetched by the server from GameSheet's image CDN and served from the site, so
+visitors' browsers only ever talk to these sites. `noindex`, and robots.txt
+disallows everything, like the sources' own.
 
 ## Running it
 
 ```sh
-make dev     # http://<this machine>:8081, fetching the real schedule
-make test    # offline: saved copies of the rink's page in internal/frontline/testdata
+make dev     # schedule on http://<this machine>:8081, RHL on :8082, real data
+make test    # offline
 ```
 
 ## Deploying
 
-It shares a DigitalOcean droplet with [finance](https://github.com/codybrookshear/finance),
-in its own Docker Compose project with its own network: it can reach the
-internet (the rink's site) but none of finance's containers. It has no secrets.
+They share a DigitalOcean droplet with [finance](https://github.com/codybrookshear/finance),
+as the Docker Compose project `hockey` (`/opt/hockey`). Each app has its own
+network, so it can reach the internet but not the other app or any of
+finance's containers. No secrets.
 
 ```
 Browser → Cloudflare → tunnel → cloudflared (droplet host)
-  → /run/hockey-web/web.sock → hockey container
+  → /run/hockey-web/web.sock → schedule container
+  → /run/rhl-web/web.sock    → rhl container
 ```
 
-- cloudflared and its config are shared, and live in the finance repo
-  (`deploy/cloudflared/config.yml`); the `hockey.brookshear.party` rule there
-  points at the socket. It's the only rule without Cloudflare Access.
-- `scripts/deploy.sh` builds the image from the committed HEAD on your
-  workstation and loads it on the droplet over SSH (the `finance` alias). No
-  registry.
+- cloudflared and its config live in the finance repo
+  (`deploy/cloudflared/config.yml`). The `hockey.` and `rhl.brookshear.party`
+  rules there point at the sockets; they're the only routes without Cloudflare
+  Access.
+- `scripts/deploy.sh` builds images from the committed HEAD on your
+  workstation and loads them on the droplet over SSH (the `finance` alias). No
+  registry. `scripts/deploy.sh rhl` (or `schedule`) deploys just one app.
 
-First deploy: `scripts/deploy.sh`, then add the hostname's DNS record (CNAME
-`hockey` → `<tunnel-id>.cfargotunnel.com`, proxied) and deploy the tunnel
-config from the finance repo (`scripts/tunnel-deploy.sh finance`).
+First deploy: `scripts/deploy.sh`, then a DNS record per hostname (CNAME
+`hockey` and `rhl` → `<tunnel-id>.cfargotunnel.com`, proxied), then deploy the
+tunnel config from the finance repo (`scripts/tunnel-deploy.sh finance`).
 
-Logs: `ssh -t finance 'cd /opt/hockey && sudo docker compose logs --tail 50 web'`.
-Rolling back: set `HOCKEY_VERSION` in `/opt/hockey/.env` to the previous
-version (`sudo docker images hockey`), then `sudo docker compose up -d web`.
+Logs: `ssh -t finance 'cd /opt/hockey && sudo docker compose logs --tail 50 rhl'`
+(or `schedule`). Rolling back: set `RHL_VERSION` (or `SCHEDULE_VERSION`) in
+`/opt/hockey/.env` to the previous version (`sudo docker images 'hockey-*'`),
+then `sudo docker compose up -d rhl`.

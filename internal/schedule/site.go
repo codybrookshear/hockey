@@ -1,25 +1,23 @@
-// Package site serves the rink's daily schedule: one table per sheet, for a
-// day picked by ?date=YYYY-MM-DD (default today). Public: no login, no
-// cookies, no scripts.
-package site
+// Package schedule serves hockey.brookshear.party: the rink's daily
+// schedule, one table per sheet, for a day picked by ?date=YYYY-MM-DD
+// (default today). Public: no login, no cookies, no scripts.
+package schedule
 
 import (
 	"bytes"
-	"crypto/sha256"
+	"context"
 	"embed"
-	"encoding/hex"
 	"fmt"
 	"html/template"
-	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"path"
 	"slices"
-	"sort"
 	"time"
 
+	"hockey/internal/cache"
 	"hockey/internal/frontline"
+	"hockey/internal/serve"
 )
 
 //go:embed templates static
@@ -36,6 +34,17 @@ const (
 	daysAhead = 120
 )
 
+// Source returns a day's events; *frontline.Client in production.
+type Source interface {
+	Day(ctx context.Context, date time.Time) ([]frontline.Event, error)
+}
+
+const (
+	freshFor         = 10 * time.Minute // serve a fetched day this long before asking again
+	retryAfter       = time.Minute      // after a failed fetch of a day, wait this long
+	fetchesPerMinute = 20               // to the rink's site, across all days
+)
+
 type Config struct {
 	Source    Source
 	SourceURL string // the rink's page, linked in the footer
@@ -45,11 +54,10 @@ type Config struct {
 }
 
 type Server struct {
-	cfg     Config
-	cache   *schedules
-	page    *template.Template
-	static  http.Handler
-	version string // content hash of static/, for cache-busting URLs
+	cfg    Config
+	days   *cache.Cache[[]frontline.Event] // by date
+	page   *template.Template
+	static *serve.Static
 }
 
 func New(cfg Config) (*Server, error) {
@@ -60,21 +68,18 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	version, err := hashFS(staticFS)
-	if err != nil {
+	s := &Server{
+		cfg:  cfg,
+		days: cache.New[[]frontline.Event](freshFor, retryAfter, cache.NewLimiter(fetchesPerMinute, cfg.Now), cfg.Now),
+	}
+	if s.static, err = serve.NewStatic(staticFS); err != nil {
 		return nil, err
 	}
-	s := &Server{
-		cfg:     cfg,
-		cache:   newSchedules(cfg.Source, cfg.Now),
-		static:  http.FileServerFS(staticFS),
-		version: version,
-	}
 	s.page, err = template.New("schedule.html").Funcs(template.FuncMap{
-		"asset": func(name string) string { return "/static/" + name + "?v=" + s.version },
+		"asset": s.static.URL,
 	}).ParseFS(files, "templates/schedule.html")
 	if err != nil {
-		return nil, fmt.Errorf("site: template: %w", err)
+		return nil, fmt.Errorf("schedule: template: %w", err)
 	}
 	return s, nil
 }
@@ -84,92 +89,13 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	// GET patterns also match HEAD; other methods get 405.
 	mux.HandleFunc("GET /{$}", s.schedule)
-	mux.HandleFunc("GET /static/", s.serveStatic)
-	mux.HandleFunc("GET /robots.txt", func(w http.ResponseWriter, r *http.Request) {
-		// The rink's own robots.txt disallows everything; don't republish
-		// their schedule to search engines.
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		io.WriteString(w, "User-agent: *\nDisallow: /\n")
-	})
-	return s.securityHeaders(s.logRequests(s.recoverPanics(mux)))
+	mux.Handle("GET /static/", s.static)
+	mux.HandleFunc("GET /robots.txt", serve.RobotsTxt)
+	return serve.Wrap(mux, csp, s.cfg.Log)
 }
 
 const csp = "default-src 'none'; style-src 'self'; img-src 'self'; " +
 	"form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
-
-func (s *Server) securityHeaders(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h := w.Header()
-		h.Set("Content-Security-Policy", csp)
-		h.Set("Cache-Control", "no-store") // pages and errors; static files override it
-		h.Set("X-Content-Type-Options", "nosniff")
-		h.Set("X-Frame-Options", "DENY")
-		h.Set("X-Robots-Tag", "noindex, nofollow")
-		h.Set("Referrer-Policy", "no-referrer")
-		h.Set("Cross-Origin-Opener-Policy", "same-origin")
-		h.Set("Cross-Origin-Resource-Policy", "same-origin")
-		h.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()")
-		h.Set("Strict-Transport-Security", "max-age=31536000")
-		next.ServeHTTP(w, r)
-	})
-}
-
-type statusWriter struct {
-	http.ResponseWriter
-	status int
-}
-
-func (w *statusWriter) WriteHeader(code int) {
-	if w.status == 0 {
-		w.status = code
-	}
-	w.ResponseWriter.WriteHeader(code)
-}
-
-func (w *statusWriter) Write(b []byte) (int, error) {
-	if w.status == 0 {
-		w.status = http.StatusOK
-	}
-	return w.ResponseWriter.Write(b)
-}
-
-func (s *Server) logRequests(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		sw := &statusWriter{ResponseWriter: w}
-		next.ServeHTTP(sw, r)
-		s.cfg.Log.Info("request", "method", r.Method, "path", r.URL.Path,
-			"status", sw.status, "ms", time.Since(start).Milliseconds())
-	})
-}
-
-func (s *Server) recoverPanics(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if v := recover(); v != nil {
-				if v == http.ErrAbortHandler {
-					panic(v)
-				}
-				s.cfg.Log.Error("panic", "path", r.URL.Path, "panic", fmt.Sprint(v))
-				http.Error(w, "Something went wrong.", http.StatusInternalServerError)
-			}
-		}()
-		next.ServeHTTP(w, r)
-	})
-}
-
-// serveStatic serves only styles and icons. URLs carry ?v=<content hash>, so
-// they can be cached for a day.
-func (s *Server) serveStatic(w http.ResponseWriter, r *http.Request) {
-	switch path.Ext(r.URL.Path) {
-	case ".css", ".svg", ".png":
-	default:
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("Cache-Control", "public, max-age=86400")
-	http.StripPrefix("/static", s.static).ServeHTTP(w, r)
-}
 
 type pageData struct {
 	Date       time.Time
@@ -229,12 +155,14 @@ func (s *Server) schedule(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.Problem == "" {
-		res := s.cache.get(r.Context(), d.Date)
+		res := s.days.Get(r.Context(), d.Date.Format(time.DateOnly), func(ctx context.Context) ([]frontline.Event, error) {
+			return s.cfg.Source.Day(ctx, d.Date)
+		})
 		if res.Err != nil {
 			s.cfg.Log.Warn("schedule unavailable", "date", d.Date.Format(time.DateOnly), "err", res.Err.Error())
 			d.Problem, status = "Couldn't get the schedule from the rink's site right now.", http.StatusBadGateway
 		} else {
-			d.Sheets, d.Fetched, d.Stale = group(res.Events, now, d.Today), res.Fetched.In(loc), res.Stale
+			d.Sheets, d.Fetched, d.Stale = group(res.Value, now, d.Today), res.Fetched.In(loc), res.Stale
 			if res.Stale {
 				s.cfg.Log.Warn("serving a stale schedule", "date", d.Date.Format(time.DateOnly))
 			}
@@ -289,28 +217,4 @@ func group(events []frontline.Event, now time.Time, today bool) []sheet {
 		out[i].Rows = append(out[i].Rows, r)
 	}
 	return out
-}
-
-func hashFS(fsys fs.FS) (string, error) {
-	var names []string
-	err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
-		if err == nil && !d.IsDir() {
-			names = append(names, p)
-		}
-		return err
-	})
-	if err != nil {
-		return "", err
-	}
-	sort.Strings(names)
-	h := sha256.New()
-	for _, n := range names {
-		b, err := fs.ReadFile(fsys, n)
-		if err != nil {
-			return "", err
-		}
-		fmt.Fprintf(h, "%s\x00%d\x00", n, len(b))
-		h.Write(b)
-	}
-	return hex.EncodeToString(h.Sum(nil))[:12], nil
 }
