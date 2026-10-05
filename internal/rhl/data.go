@@ -54,7 +54,7 @@ type teamData struct {
 
 type divisionTab struct {
 	ID       int
-	Title    string
+	Label    string // the title; shortened when there are more than two
 	Selected bool
 }
 
@@ -156,6 +156,13 @@ func divisionsOf(st stats) []divisionRef {
 	return out
 }
 
+func cutSuffixFold(s, suffix string) (string, bool) {
+	if len(s) >= len(suffix) && strings.EqualFold(s[len(s)-len(suffix):], suffix) {
+		return s[:len(s)-len(suffix)], true
+	}
+	return s, false
+}
+
 // pickDivision returns want if the season has it, else the first division
 // (0 when there are none: nothing is filtered).
 func pickDivision(divs []divisionRef, want int) int {
@@ -173,7 +180,14 @@ func (s *Server) homeData(st stats, div int) homeData {
 	d := homeData{page: s.pageData(st)}
 	if divs := divisionsOf(st); len(divs) > 1 {
 		for _, ref := range divs {
-			d.Divisions = append(d.Divisions, divisionTab{ID: ref.ID, Title: ref.Title, Selected: ref.ID == div})
+			label := ref.Title
+			if len(divs) > 2 {
+				// Four of "A/B Division" don't fit across a phone; "A/B" do.
+				if short, ok := cutSuffixFold(label, " division"); ok && short != "" {
+					label = short
+				}
+			}
+			d.Divisions = append(d.Divisions, divisionTab{ID: ref.ID, Label: label, Selected: ref.ID == div})
 		}
 	}
 	// The division's teams, to pick out their players.

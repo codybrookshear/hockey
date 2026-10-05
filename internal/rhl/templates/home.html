@@ -2,9 +2,9 @@
 
 {{define "content"}}
 {{- with .Divisions}}
-<nav class="divisions" aria-label="Division">
+<nav class="divisions{{if gt (len .) 2}} many{{end}}" aria-label="Division">
   {{- range .}}
-  <a href="/?division={{.ID}}"{{if .Selected}} aria-current="page"{{end}}>{{.Title}}</a>
+  <a href="/?division={{.ID}}"{{if .Selected}} aria-current="page"{{end}}>{{.Label}}</a>
   {{- end}}
 </nav>
 {{- end}}
