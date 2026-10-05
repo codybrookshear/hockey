@@ -1,0 +1,32 @@
+# Production, on the droplet: scripts/deploy-install.sh installs it as
+# /opt/hockey/compose.yaml. The image is built on the workstation and loaded
+# over SSH by scripts/deploy.sh, so nothing is built or pulled here.
+#
+# Its own Compose project (hockey), apart from the finance app on the same
+# droplet: its only network is its own, so it can reach the internet (the
+# rink's site) but none of finance's containers. No secrets, no volumes but
+# the socket directory.
+
+services:
+  web:
+    image: hockey:${HOCKEY_VERSION:?}
+    pull_policy: never
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    environment:
+      # A Unix socket in /run/hockey-web (host) for cloudflared; no published port.
+      HOCKEY_SOCKET: /run/web/web.sock
+      HOCKEY_TZ: America/Los_Angeles
+      GOMEMLIMIT: 100MiB
+    volumes:
+      - /run/hockey-web:/run/web
+    networks: [egress]
+    # Public site on a shared droplet: a flood of requests can't starve the rest.
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
+
+networks:
+  egress: {}

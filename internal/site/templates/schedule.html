@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>Hockey · {{.Date.Format "Mon Jan 2"}}</title>
+<link rel="icon" href="{{asset "icon.svg"}}" type="image/svg+xml">
+<link rel="apple-touch-icon" href="{{asset "icon-180.png"}}">
+<meta name="apple-mobile-web-app-title" content="Hockey">
+<meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1120" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="{{asset "hockey.css"}}">
+</head>
+<body>
+<header class="top">
+  <p class="rink">The Rink Exchange</p>
+  <h1>{{.Date.Format "Monday, January 2"}}{{if .Today}} <span class="today">Today</span>{{end}}</h1>
+  <nav class="days">
+    {{if .Prev}}<a href="/?date={{.Prev}}" rel="prev">‹ {{(.Date.AddDate 0 0 -1).Format "Mon"}}</a>{{else}}<span></span>{{end}}
+    {{if not .Today}}<a href="/">Today</a>{{else}}<span></span>{{end}}
+    {{if .Next}}<a href="/?date={{.Next}}" rel="next">{{(.Date.AddDate 0 0 1).Format "Mon"}} ›</a>{{else}}<span></span>{{end}}
+  </nav>
+</header>
+<main>
+{{if .Problem}}
+  <p class="problem">{{.Problem}}</p>
+{{else}}
+  {{if .Stale}}<p class="problem">Couldn't reach the rink's site. This is the schedule as of {{.Fetched.Format "Mon 3:04 PM"}}.</p>{{end}}
+  {{range .Sheets}}
+  <section>
+    <h2>{{.Name}}</h2>
+    <table>
+      <thead><tr><th class="time">Time</th><th>Home</th><th>Away</th></tr></thead>
+      <tbody>
+      {{range .Rows}}
+        <tr{{with .State}} class="{{.}}"{{end}}>
+          <td class="time"><span>{{.Start}}</span><span>–{{.End}}</span>{{if eq .State "now"}} <em>now</em>{{end}}</td>
+          {{if .Same}}
+          <td colspan="2" class="event">{{template "side" .Home}}</td>
+          {{else}}
+          <td>{{template "side" .Home}}</td>
+          <td>{{template "side" .Away}}</td>
+          {{end}}
+        </tr>
+      {{else}}
+        <tr><td colspan="3" class="empty">Nothing scheduled.</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </section>
+  {{end}}
+{{end}}
+  <form class="jump" method="get" action="/">
+    <label for="date">Go to a day</label>
+    <input id="date" type="date" name="date" value="{{.Date.Format "2006-01-02"}}" min="{{.Min}}" max="{{.Max}}" required>
+    <button type="submit">Go</button>
+  </form>
+</main>
+<footer>
+  From the <a href="{{.SourceURL}}" rel="noreferrer">rink's schedule</a>{{if not .Fetched.IsZero}}, checked {{.Fetched.Format "3:04 PM"}}{{end}}.
+  Schedules are subject to change.
+</footer>
+</body>
+</html>
+{{define "side"}}{{.Name}}{{with .Locker}}<span class="locker">Locker {{.}}</span>{{end}}{{end}}

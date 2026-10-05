@@ -1,0 +1,21 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request: {}
+
+permissions:
+  contents: read   # least privilege for the workflow token
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: { persist-credentials: false }
+      - uses: actions/setup-go@v7
+        with: { go-version-file: go.mod }
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      # Offline: the scraper is tested against saved copies of the rink's page.
+      - run: go test -race -count=1 ./...
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

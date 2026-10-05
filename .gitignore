@@ -1,0 +1,5 @@
+/bin/
+/tmp/
+.DS_Store
+# Claude Code's local worktrees and screenshots.
+/.claude/

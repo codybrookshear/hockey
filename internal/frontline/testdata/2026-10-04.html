@@ -1,0 +1,789 @@
+
+    <!-- UID parameter exists in the URL -->
+    
+        <!-- Valid numeric UID -->
+        
+    
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+
+
+<head><script type="text/javascript" src="/CFIDE/scripts/cfform.js"></script>
+<script type="text/javascript" src="/CFIDE/scripts/masks.js"></script>
+
+
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252" />
+<meta http-equiv="expires" content="Mon, 06 Jan 1990 00:00:01 GMT"> 
+<meta http-equiv="pragma" content="no-cache"> 
+
+<title>The Rink Exchange</title>
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+        <link rel="stylesheet" type="text/css" href="https://laneice.frontline-connect.com/laneice/533798.css?v=3" /> 
+
+        <script type="text/javascript" src="https://laneice.frontline-connect.com/js/autoIframe.js"></script>
+
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/formvalidation/0.6.2-dev/css/formValidation.min.css" integrity="sha512-B9GRVQaYJ7aMZO3WC2UvS9xds1D+gWQoNiXiZYRlqIVszL073pHXi0pxWxVycBk0fnacKIE3UHuWfSeETDCe7w==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.6.2/css/bootstrap-select.min.css" />
+            
+     
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/formvalidation/0.6.2-dev/js/formValidation.min.js" integrity="sha512-DlXWqMPKer3hZZMFub5hMTfj9aMQTNDrf0P21WESBefJSwvJguz97HB007VuOEecCApSMf5SY7A7LkQwfGyVfg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/formvalidation/0.6.2-dev/js/framework/bootstrap.min.js" integrity="sha512-CwWsnPwntKMVNsVVCKIxPd4Ievk/YyAxt/yFNOLbs4JH3W6djpxYf2G50DtxLxFGHIbZxXeVDyjmTT8RCNp8DQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.6.2/js/bootstrap-select.min.js"></script>
+
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js" integrity="sha512-pHVGpX7F/27yZ0ISY+VVjyULApbDlD0/X0rgGbTqCE7WFW5MezNTWG/dnhtbBuICzsd0WQPgpE4REBLv+UqChw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-55173708-1', 'auto');
+  ga('require', 'displayfeatures');
+  ga('send', 'pageview');
+
+</script>
+
+
+
+
+<script type="text/javascript">
+<!--
+    _CF_checkform0 = function(_CF_this)
+    {
+        //reset on submit
+        _CF_error_exists = false;
+        _CF_error_messages = new Array();
+        _CF_error_fields = new Object();
+        _CF_FirstErrorField = null;
+
+
+        //display error messages and return success
+        if( _CF_error_exists )
+        {
+            if( _CF_error_messages.length > 0 )
+            {
+                // show alert() message
+                _CF_onErrorAlert(_CF_error_messages);
+                // set focus to first form error, if the field supports js focus().
+                if( _CF_this[_CF_FirstErrorField].type == "text" )
+                { _CF_this[_CF_FirstErrorField].focus(); }
+
+            }
+            return false;
+        }else {
+            return true;
+        }
+    }
+//-->
+</script>
+</head>
+
+<style type="text/css">
+ .timeClass {
+  font-family:arial,verdana,helvetica,sans-serif;
+  font-weight:normal;
+  font-size:10pt;
+  }
+</style>
+
+<style type="text/css">
+#accountdiv{
+width:inherit;
+text-align:center;
+height:26px;
+background:-webkit-gradient( linear, left top, left bottom, color-stop(0.05, #333333), color-stop(1, #150517) );
+background:-moz-linear-gradient( center top, #333333 5%, #150517 100% );
+filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#333333', endColorstr='#150517');
+-ms-filter: "progid:DXImageTransform.Microsoft.gradient(startColorstr=#333333, endColorstr=#150517)";
+background-image: -o-linear-gradient(top,#333333,#150517);
+background-image: -ms-linear-gradient(top, #333333, #150517);
+}
+
+
+.style3 {color: #000066; font-family:Arial, Helvetica, sans-serif;}
+a.accountlinks:link{color:#CCCCCC; font-family:Arial, Helvetica, sans-serif; font-weight:bold; text-decoration:none; font-size:12px;}
+a.accountlinks:hover{color:#FFFFFF; font-family:Arial, Helvetica, sans-serif; font-weight:bold; text-decoration:none; font-size:12px;}
+a.accountlinks:active{color:#CCCCCC; font-family:Arial, Helvetica, sans-serif; font-weight:bold; text-decoration:none; font-size:12px;}
+a.accountlinks:visited{color:#CCCCCC; font-family:Arial, Helvetica, sans-serif; font-weight:bold; text-decoration:none; font-size:12px;}
+.accountstyle2{
+font-family:Arial, Helvetica, sans-serif;
+color:#CCCCCC;
+font-weight:bold;
+font-size:12px;
+}
+.whiteon{
+color:#FFFFFF; font-family:Arial, Helvetica, sans-serif; font-weight:bold; text-decoration:none; font-size:12px;
+}
+.whiteoff{
+color:#CCCCCC; font-family:Arial, Helvetica, sans-serif; font-weight:bold; text-decoration:none; font-size:12px;
+}
+</style>
+
+
+
+<body class="container">
+
+
+
+
+<div id="pagewidth"  >
+
+<center>
+<style>
+#accountnav {
+	padding:0px !important;
+	margin:0px !important;
+}
+</style>
+
+
+
+ 
+<nav class="navbar  navbar-inverse" id="accountnav">
+<ul class="nav navbar-nav hidden-sm hidden-xs" >
+  <li><a href="javascript:void(0)" style="cursor:default;">Not logged in</a></li>
+  <li><a href="accountlogin.cfm?fac=laneice&facid=1">My Account</a></li>
+  <li><a href="orderlogin.cfm?fac=laneice&facid=1">My Orders</a></li>
+   
+
+	<li>
+	  <a href="createnewaccount.cfm?fac=laneice&facid=1">Create Account</a>
+	</li>
+
+</ul>
+
+	<div class="dropdown hidden-lg hidden-md" style="maring:0px;padding:0px;">
+	  <button class="btn btn-default dropdown-toggle btn-md" type="button" data-toggle="dropdown">
+		
+	    Login
+	    
+	    <span class="caret"></span>
+	  </button>
+	  <ul class="dropdown-menu menu-right">
+  		<li><a href="accountlogin.cfm?fac=laneice&facid=1">My Account</a></li>
+	    <li><a href="orderlogin.cfm?fac=laneice&facid=1">My Orders</a></li>
+		
+   
+		
+			<li>
+			  <a href="createnewaccount.cfm?fac=laneice&facid=1">Create Account</a>
+			</li>
+		
+	  </ul>
+	</div>
+</nav>
+
+
+
+
+		<div id="header" style="background-position:center"></div>
+	
+</center> 
+
+
+
+
+
+	<div id="nav">
+			<meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+<style>
+.navbar {
+	margin-bottom:0px !important;
+}
+.navbar .navbar-nav {
+  display: inline-block;
+  float: none;
+  vertical-align: top;
+}
+
+.navbar .navbar-collapse {
+  text-align: center;
+}
+
+.scrollclass {
+ max-height:300px;
+ overflow-y:scroll;	
+}
+</style>
+
+<script>
+
+$( document ).ready(function() {
+
+
+
+		var spyoffset = $('#scrollanchor').offset();
+		var spyoffsetleft = spyoffset.left;
+		var spyoffsettop = spyoffset.top;
+		
+		$( window ).scroll(function() {
+		  if( $(window).scrollTop() >= spyoffsettop )
+		  {
+			$('#mainnavbar').addClass('navbar-fixed-top');
+		  }
+		});	
+
+
+		$( window ).scroll(function() {
+		  if( $(window).scrollTop() <= 0 )
+		  {
+		  	$('#mainnavbar').removeClass('navbar-fixed-top');
+		  }
+		});	
+});
+</script>
+
+<div id="scrollanchor"></div>
+
+
+<nav id="mainnavbar" class="navbar  navbar-inverse">
+  <div class="container-fluid">
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </button>
+      <div class="navbar-brand hidden-lg hidden-md hidden-sm">The Rink Exchange</div>
+    </div>
+    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+      <ul class="nav navbar-nav">
+	
+			<li><a href="http://www.therinkexchange.com/">Home</a></li>
+			
+
+
+		<li class="dropdown">
+          <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Schedules <span class="caret"></span></a>
+         
+         
+          <ul class="dropdown-menu scrollclass" role="menu">
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=23">Adult Drop-In</a></li>
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=12">Adult Hockey League</a></li>
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=22">Adult Public Skate Session</a></li>
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=24">Adult Stick-Time</a></li>
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=14">Adult Tournaments</a></li>
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=10">Eugene Generals</a></li>
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=19">Family Drop-In</a></li>
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=3">Family Stick Time</a></li>
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=4">Freestyle</a></li>
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=13">Hockey Class</a></li>
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=9">Learn to Skate</a></li>
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=11">Oregon Ducks Hockey</a></li>
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=5">Private Ice</a></li>
+		  
+            <li><a href="monthlyEvents.cfm?fac=laneice&facid=1&session=25">Youth Stick-Time</a></li>
+		  
+          </ul>
+		  </li>
+
+
+		
+
+      </ul>
+
+    </div>
+  </div>
+</nav>
+
+
+	</div>
+
+	
+			<div id="wrapper" class="clearfix" align="left" > 
+			<div id="maincol" >
+			
+			
+			<br /><br /><br /><br /><br />
+			
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+
+
+
+
+<link href="..//datepicker/bootstrap-datepicker.css" rel="stylesheet">
+<script src="..//datepicker/bootstrap-datepicker.js"></script>
+
+<style type="text/css">
+
+/*html, body{ 
+ margin:0;
+ padding:0; 
+ text-align:center !important;
+background-color: #ffffff !important;
+background:none !important;
+
+} 
+ 
+#pagewidth{ 
+ width:100% !important; 
+ text-align:center !important;
+ margin-left:0px !important;  
+ margin-right:0px !important;
+
+} 
+#wrapper{
+width:100% !important;
+}
+#header{
+display:none !important;
+} 
+ #nav{
+display:none !important;
+} 
+#accountdiv {
+display:none !important;
+}
+#maincol{float:none;background-color: #FFFFFF; } 
+ #footer{
+ display:none;
+ } */
+ 
+</style>
+
+
+<script>
+	
+$(function() {
+	$( "#datepicker" ).datepicker({
+		autoclose: true,
+		todayHighlight: true,
+		orientation: "bottom",
+		container: ".datepickerdiv"
+	}); 	
+});	
+	
+// $(function() {
+// 	
+//	$('#datepickerbbb').glDatePicker(
+//
+//    {
+//        onClick: function(target, cell, date, data) {
+//            target.val(("0" + (date.getMonth() + 1)).slice(-2) + '/' +
+//                ("0" + date.getDate()).slice(-2) + '/' +
+//                date.getFullYear());
+//
+//            if(data != null) {
+//                alert(data.message + '\n' + date);
+//            }
+//        }            
+//    }		
+//
+//	);
+//	
+//	
+//
+//});
+
+	</script>
+
+<form name="form0" id="form0" action="&#x2f;dailysched.cfm?fac=laneice&facid=1" method="post" class="form-inline" onsubmit="return _CF_checkform0(this)">
+
+<div>
+
+
+<div class="panel panel-primary">
+
+			
+		<div class="panel-heading">
+			<div class="row">
+			<div class="col-md-2 col-lg-2 text-left">
+			<a class="btn btn-default btn-sm" href="7dayschedule.cfm?fac=laneice&facid=1">
+			  <span class="glyphicon glyphicon-calendar" aria-hidden="true"></span> All Schedules
+			</a>
+			</div>
+			<div class="col-md-10 col-lg-10 text-center col-md-pull-1 col-lg-pull-1">
+			<h4>Daily Events for Sunday Oct 04, 2026</h4>
+			</div>
+			</div>
+		</div>			
+			
+		<div class="panel-body">
+		<div class="row">
+			<div class="col-md-2 col-lg-2 col-sm-12 col-xs-12 text-center">
+			
+				<a href="printDailyEvents.cfm?fac=laneice&facid=1" target="_blank" class="hidden-sm hidden-xs">
+					<span class="glyphicon glyphicon-print" aria-hidden="true"></span>
+					<span class="text-primary"><strong>Print today's events</strong></span>
+				</a>
+				<a href="printDailyEvents.cfm?fac=laneice&facid=1" target="_blank" class="hidden-lg hidden-md text-left">
+					<span class="glyphicon glyphicon-print" aria-hidden="true"></span>
+				</a>
+			
+				
+			</div>
+
+				<div class="col-md-7 col-lg-7 col-sm-12 col-xs-12 text-center datepickerdiv">
+					<div class="form-group">
+						<div class="input-group text-right">
+							<input name="SelectedDate" type="text" value="10/04/2026" id="datepicker"  class="form-control"  readonly="true"  />
+		 					<span class="input-group-btn text-left">
+		 						<input name="sChange" id="sChange"  type="submit" value="Get Date" class="btn btn-primary"  />
+		 					</span>
+						</div>
+					</div>
+				</div>
+
+			<div class="col-md-3 col-lg-3 col-sm-12 col-xs-12 text-center">
+
+				<div class="dropdown">
+				  <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-expanded="true">
+					<span id="surfspan">
+					
+					Select Surface
+					
+					</span>
+					<span class="caret"></span>
+				  </button>
+				  <ul class="dropdown-menu" role="menu" aria-labelledby="dropdownMenu1">
+					<li role="presentation" class="dropdown-header">Filter Surfaces</li>
+					<li role="presentation"><a class="menuoption" role="menuitem" tabindex="-1" href="dailysched.cfm?fac=laneice&facid=1">ALL</a></li>
+					
+					<li role="presentation"><a class="menuoption" role="menuitem" tabindex="-1" href="dailysched.cfm?fac=laneice&facid=1&surfSelect=1">Big Sheet</a></li>
+					
+					<li role="presentation"><a class="menuoption" role="menuitem" tabindex="-1" href="dailysched.cfm?fac=laneice&facid=1&surfSelect=7">Mini Sheet</a></li>
+					
+				  </ul>
+				</div>
+			
+			</div>
+		</div>
+
+		</div>
+</div>
+<div class="row">
+	
+	<div class="col-md-6 col-lg-6 text-center">
+		<div class="label label-danger text-center"><strong>ALL SCHEDULES ARE SUBJECT TO CHANGE AND ADDITIONAL PRICING</strong></div>
+	</div>	
+	<div class="col-md-6 col-lg-6 text-center">
+		<span class="hidden-lg hidden-md"><br></span>
+		<div class="label label-success text-center"><strong>For a more detailed schedule please click ALL SCHEDULES<span class="hidden-lg hidden-md"><br><br></span> and then choose daily schedule</strong></div>
+	</div>
+	
+</div><br>
+
+		<TABLE class="table table-responsive table-hover table-bordered table-striped">
+		<thead>
+		<tr>
+			<th class="text-center">Event Time</th>
+			<th class="text-center">Surface</th>
+			
+			<th class="text-center">Home or Event</th>
+			<th class="text-center">Away or Event</th>
+		</tr>
+		</thead>
+		
+		<tr>
+			<td class="text-center">07:15 A - 08:45 A</td>
+
+			<td class="text-center">Big Sheet</td>
+			
+			
+				
+			<td class="text-center">16U LAHA <div class="alert alert-info" style="margin:1px;padding:1px;">Locker: 2</div> 
+			</td>
+				
+			<td class="text-center">Tacoma <div class="alert alert-success" style="margin:1px;padding:1px;">Locker: 6</div> 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">09:00 A - 10:15 A</td>
+
+			<td class="text-center">Big Sheet</td>
+			
+			
+				
+			<td class="text-center">Havoc <div class="alert alert-info" style="margin:1px;padding:1px;">Locker: 3</div> 
+			</td>
+				
+			<td class="text-center">Sky Guardians <div class="alert alert-success" style="margin:1px;padding:1px;">Locker: 5</div> 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">09:45 A - 10:45 A</td>
+
+			<td class="text-center">Mini Sheet</td>
+			
+			
+				
+			<td class="text-center">Yth Stick-Time <div class="alert alert-info" style="margin:1px;padding:1px;">Locker: 9</div> 
+			</td>
+				
+			<td class="text-center">Yth Stick-Time 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">10:30 A - 11:45 A</td>
+
+			<td class="text-center">Big Sheet</td>
+			
+			
+				
+			<td class="text-center">Ice Dogs <div class="alert alert-info" style="margin:1px;padding:1px;">Locker: 2</div> 
+			</td>
+				
+			<td class="text-center">Oakshire <div class="alert alert-success" style="margin:1px;padding:1px;">Locker: 6</div> 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">11:00 A - 12:00 P</td>
+
+			<td class="text-center">Mini Sheet</td>
+			
+			
+				
+			<td class="text-center">RX Freestyle <div class="alert alert-info" style="margin:1px;padding:1px;">Locker: 10</div> 
+			</td>
+				
+			<td class="text-center">RX Freestyle 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">12:00 P - 01:30 P</td>
+
+			<td class="text-center">Big Sheet</td>
+			
+			
+				
+			<td class="text-center">Public Skate 
+			</td>
+				
+			<td class="text-center">Public Skate 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">12:15 P - 01:15 P</td>
+
+			<td class="text-center">Mini Sheet</td>
+			
+			
+				
+			<td class="text-center">RBL Practice <div class="alert alert-info" style="margin:1px;padding:1px;">Locker: 9</div> 
+			</td>
+				
+			<td class="text-center">10/12U 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">01:30 P - 02:30 P</td>
+
+			<td class="text-center">Mini Sheet</td>
+			
+			
+				
+			<td class="text-center">Yth Stick-Time <div class="alert alert-info" style="margin:1px;padding:1px;">Locker: 10</div> 
+			</td>
+				
+			<td class="text-center">Yth Stick-Time 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">01:45 P - 03:00 P</td>
+
+			<td class="text-center">Big Sheet</td>
+			
+			
+				
+			<td class="text-center">Dolly Defenders <div class="alert alert-info" style="margin:1px;padding:1px;">Locker: 3</div> 
+			</td>
+				
+			<td class="text-center">Best Med <div class="alert alert-success" style="margin:1px;padding:1px;">Locker: 5</div> 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">02:45 P - 03:45 P</td>
+
+			<td class="text-center">Mini Sheet</td>
+			
+			
+				
+			<td class="text-center">Adult Stick-Time <div class="alert alert-info" style="margin:1px;padding:1px;">Locker: 9</div> 
+			</td>
+				
+			<td class="text-center">Adult Stick-Time 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">03:15 P - 04:30 P</td>
+
+			<td class="text-center">Big Sheet</td>
+			
+			
+				
+			<td class="text-center">Rogue <div class="alert alert-info" style="margin:1px;padding:1px;">Locker: 2</div> 
+			</td>
+				
+			<td class="text-center">White Lightning <div class="alert alert-success" style="margin:1px;padding:1px;">Locker: 6</div> 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">04:45 P - 06:15 P</td>
+
+			<td class="text-center">Big Sheet</td>
+			
+			
+				
+			<td class="text-center">Public Skate 
+			</td>
+				
+			<td class="text-center">Public Skate 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">05:00 P - 06:00 P</td>
+
+			<td class="text-center">Mini Sheet</td>
+			
+			
+				
+			<td class="text-center">RBL Practice <div class="alert alert-info" style="margin:1px;padding:1px;">Locker: 10</div> 
+			</td>
+				
+			<td class="text-center">10/12U 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">06:30 P - 07:45 P</td>
+
+			<td class="text-center">Big Sheet</td>
+			
+			
+				
+			<td class="text-center">Renegades <div class="alert alert-info" style="margin:1px;padding:1px;">Locker: 3</div> 
+			</td>
+				
+			<td class="text-center">Orange <div class="alert alert-success" style="margin:1px;padding:1px;">Locker: 5</div> 
+			</td>
+		</tr>
+		
+		<tr>
+			<td class="text-center">08:00 P - 09:15 P</td>
+
+			<td class="text-center">Big Sheet</td>
+			
+			
+				
+			<td class="text-center">Nova Cains <div class="alert alert-info" style="margin:1px;padding:1px;">Locker: 2</div> 
+			</td>
+				
+			<td class="text-center">Kelly Green <div class="alert alert-success" style="margin:1px;padding:1px;">Locker: 6</div> 
+			</td>
+		</tr>
+		
+		</TABLE>
+		
+	</div>	
+</form>
+
+
+<script language="javascript">$(document).ready(function() 
+{       //Transition you want :)     
+var easing_type = 'easeOutBounce';           
+//The default height for the dock (on mouse out)     
+var default_dock_height = '40';           
+//Expanded height, the height of the dock on mouse over, you have to set it in CSS     
+var expanded_dock_height = $('#dock').height();           
+//Fake body height     
+var body_height = $(window).height() - default_dock_height;           
+//Set the size of #fake_body     
+$('#fake-body').height(body_height);           
+//Set the CSS attribute for #dock     
+$('#dock').css({'height': default_dock_height, 'position':'absolute', 'top': body_height});           
+//In case the user resize the browser, we will need to recalculate the height and top for #fake_body and #dock     
+$(window).resize(function () {                   
+//Grab the updated height/top         
+updated_height = $(window).height() - default_dock_height;                   
+//Set the updated height for #fake_body and top for #dock         
+$('#fake-body').height(updated_height);              
+$('#dock').css({'top': updated_height});     });               
+//The main event for the dock bottom menu     
+$('#viewdock').click(function (){
+expanded_height = $(window).height() - expanded_dock_height;   
+$('#dock').animate({'height':expanded_dock_height,'top': expanded_height},{queue:false, duration:800});
+});
+$('#closedock').click(function (){
+body_height = $(window).height() - default_dock_height;
+$('#dock').animate({'height':default_dock_height,'top': body_height},{queue:false, duration:800});
+});
+//$('#dock').mouseover(function () {                   
+//Recalculate expanded height (always get the latest height), in case user has resized the window         
+//expanded_height = $(window).height() - expanded_dock_height;                   
+//Animate the height change, set the height to expanded_dock_height and set the top value as well         
+//$(this).animate({'height':expanded_dock_height,'top': expanded_height},{queue:false, duration:800});               
+//}).mouseout(function () {                   
+//Recalculate default body height (always get the latest height), in case user has resized the window         
+//body_height = $(window).height() - default_dock_height;                   
+//Animate the height change, set the height to default_dock-height and set the top value as well         
+//$(this).animate({'height':default_dock_height,'top': body_height},{queue:false, duration:800});               
+//});       
+}); 
+</script>	
+
+
+
+
+
+</div>
+
+
+	<div id="footer" > 
+	</div>
+
+
+
+	</div>
+
+
+
+	</center>
+
+
+</body>
+
+</html>

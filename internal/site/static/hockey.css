@@ -1,0 +1,186 @@
+:root {
+  --bg: #f8fafc;
+  --fg: #0f172a;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --card: #ffffff;
+  --accent: #1d4ed8;
+  --now: #dbeafe;
+  --warn-bg: #fef3c7;
+  --warn-fg: #92400e;
+  --radius: 10px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1120;
+    --fg: #f1f5f9;
+    --muted: #94a3b8;
+    --line: #1e293b;
+    --card: #111827;
+    --accent: #60a5fa;
+    --now: #172554;
+    --warn-bg: #422006;
+    --warn-fg: #fcd34d;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  overflow-x: clip;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+a { color: var(--accent); }
+
+header.top, main, footer {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+header.top { padding-top: calc(1rem + env(safe-area-inset-top)); }
+
+.rink {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+h1 { font-size: 1.5rem; margin: 0.1rem 0 0.75rem; }
+
+.today {
+  font-size: 0.8rem;
+  vertical-align: middle;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* Prev / Today / Next: big enough to tap. */
+.days {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.days a {
+  padding: 0.55rem 0.5rem;
+  text-align: center;
+  text-decoration: none;
+  font-weight: 600;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+main { padding-top: 0.5rem; padding-bottom: 1.5rem; }
+
+h2 { font-size: 1.1rem; margin: 1.25rem 0 0.4rem; }
+
+/* Fixed layout: both sheets' columns line up. */
+table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  font-size: 0.95rem;
+}
+
+th, td {
+  padding: 0.5rem 0.55rem;
+  text-align: left;
+  vertical-align: top;
+  border-top: 1px solid var(--line);
+}
+
+thead th {
+  border-top: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* The time wraps between start and end, never inside either. */
+.time { width: 8rem; font-variant-numeric: tabular-nums; }
+td.time span { white-space: nowrap; }
+td.time em {
+  display: block;
+  font-style: normal;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+td.event { text-align: center; }
+
+.locker {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+tr.past td { color: var(--muted); }
+tr.past .locker { opacity: 0.8; }
+tr.now td { background: var(--now); }
+
+.empty { color: var(--muted); text-align: center; }
+
+.problem {
+  margin: 1rem 0 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--warn-bg);
+  color: var(--warn-fg);
+}
+
+.jump {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.jump label {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* 16px: iPhone Safari zooms into any field with smaller text. */
+input, button {
+  font: inherit;
+  font-size: 16px;
+  min-width: 0;
+  padding: 0.5rem 0.6rem;
+  color: var(--fg);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+button { font-weight: 600; padding-left: 1rem; padding-right: 1rem; }
+
+footer {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  color: var(--muted);
+  font-size: 0.8rem;
+}
