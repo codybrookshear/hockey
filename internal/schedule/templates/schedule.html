@@ -33,20 +33,15 @@
   <section>
     <h2>{{.Name}}</h2>
     <table>
-      <thead><tr><th class="time">Time</th><th>Home</th><th>Away</th></tr></thead>
+      <thead><tr><th class="time">Time</th><th>Event</th></tr></thead>
       <tbody>
       {{range .Rows}}
         <tr{{with .State}} class="{{.}}"{{end}}>
           <td class="time"><span>{{.Start}}</span><span>–{{.End}}</span>{{if eq .State "now"}} <em>now</em>{{end}}</td>
-          {{if .Same}}
-          <td colspan="2" class="event">{{template "side" .Home}}</td>
-          {{else}}
-          <td>{{template "side" .Home}}</td>
-          <td>{{template "side" .Away}}</td>
-          {{end}}
+          <td>{{range $i, $s := .Sides}}{{if $i}}, {{end}}<span class="side">{{$s.Name}}{{range $s.Lockers}} <span class="locker{{with .Class}} {{.}}{{end}}">{{template "locker"}}{{.Label}}</span>{{end}}</span>{{end}}</td>
         </tr>
       {{else}}
-        <tr><td colspan="3" class="empty">Nothing scheduled.</td></tr>
+        <tr><td colspan="2" class="empty">Nothing scheduled.</td></tr>
       {{end}}
       </tbody>
     </table>
@@ -65,4 +60,4 @@
 </footer>
 </body>
 </html>
-{{define "side"}}{{.Name}}{{with .Locker}}<span class="locker">Locker {{.}}</span>{{end}}{{end}}
+{{define "locker"}}<svg role="img" aria-label="Locker" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><title>Locker</title><rect x="1.75" y="1.25" width="12.5" height="13.5" rx="1"/><path d="M8 1.25v13.5M4 4.25h2M10 4.25h2M6 8.5v2M10 8.5v2"/></svg>{{end}}

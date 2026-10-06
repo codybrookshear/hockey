@@ -8,6 +8,9 @@
   --now: #dbeafe;
   --warn-bg: #fef3c7;
   --warn-fg: #92400e;
+  --blue: #1d4ed8;
+  --red: #b91c1c;
+  --locker: #64748b;
   --radius: 10px;
   color-scheme: light dark;
 }
@@ -23,6 +26,9 @@
     --now: #172554;
     --warn-bg: #422006;
     --warn-fg: #fcd34d;
+    --blue: #2563eb;
+    --red: #c81e1e;
+    --locker: #475569;
   }
 }
 
@@ -119,8 +125,8 @@ thead th {
 }
 
 /* The time wraps between start and end, never inside either. */
-.time { width: 8rem; font-variant-numeric: tabular-nums; }
-td.time span { white-space: nowrap; }
+.time { width: 8.75rem; font-variant-numeric: tabular-nums; }
+td.time span { display: inline-block; white-space: nowrap; }
 td.time em {
   display: block;
   font-style: normal;
@@ -129,13 +135,30 @@ td.time em {
   color: var(--accent);
 }
 
-td.event { text-align: center; }
-
+/* "Home [🗄 2], Away [🗄 6]": each locker a chip after its team's
+   name, blue for lockers 1-4 and red for 5 and up (opposite sides of the
+   rink). A narrow screen puts away on its own line rather than breaking
+   inside a name. */
+.side { display: inline-block; }
 .locker {
-  display: block;
-  color: var(--muted);
-  font-size: 0.8rem;
+  display: inline-block;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--locker);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
 }
+.locker svg {
+  width: 1em;
+  height: 1em;
+  margin-right: 0.15rem;
+  vertical-align: -0.15em;
+}
+.locker.blue { background: var(--blue); }
+.locker.red { background: var(--red); }
 
 tr.past td { color: var(--muted); }
 tr.past .locker { opacity: 0.8; }

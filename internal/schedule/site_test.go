@@ -8,6 +8,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -89,13 +92,24 @@ func TestSchedulePage(t *testing.T) {
 		t.Fatalf("GET /: %d", w.Code)
 	}
 	body := w.Body.String()
+	if !strings.Contains(body, `<svg role="img" aria-label="Locker"`) {
+		t.Error("page lacks the locker icon")
+	}
+	icons := regexp.MustCompile(`<svg role="img" aria-label="Locker".*?</svg>`).ReplaceAllString(body, "[L]")
+	for _, want := range []string{
+		`<td><span class="side">16U LAHA <span class="locker blue">[L]2</span></span>, <span class="side">Tacoma <span class="locker red">[L]6</span></span></td>`,
+		`<td><span class="side">Yth Stick-Time <span class="locker red">[L]9</span></span></td>`,
+	} {
+		if !strings.Contains(icons, want) {
+			t.Errorf("page lacks %q", want)
+		}
+	}
 	for _, want := range []string{
 		"Sunday, October 4", ">Today<",
 		`href="/?date=2026-10-03"`, `href="/?date=2026-10-05"`,
 		"<h2>Big Sheet</h2>", "<h2>Mini Sheet</h2>",
-		`<td colspan="2" class="event">Yth Stick-Time<span class="locker">Locker 9</span></td>`,
-		"16U LAHA", "Locker 2", "Tacoma",
-		`<td colspan="2" class="event">Public Skate</td>`, // one cell for both sides
+		`<th class="time">Time</th><th>Event</th></tr>`,   // one column for both sides
+		`<td><span class="side">Public Skate</span></td>`, // one event, named once
 		"<span>7:15</span><span>–8:45 AM</span>",
 		"<span>11:00 AM</span><span>–12:00 PM</span>",     // crosses noon
 		"Nova Cains &amp; Co", "&lt;b&gt;Kelly&lt;/b&gt;", // escaped
@@ -291,7 +305,79 @@ func TestGroupKeepsUnknownSurfaces(t *testing.T) {
 		len(got[0].Rows) != 0 || len(got[2].Rows) != 1 {
 		t.Fatalf("sheets: %+v", got)
 	}
-	if r := got[1].Rows[0]; !r.Same || r.Home.Locker != "9, 10" {
+	if r := got[1].Rows[0]; !reflect.DeepEqual(r.Sides, []side{{Name: "A", Lockers: []chip{{"9 & 10", "red"}}}}) {
 		t.Errorf("both lockers on a single event: %+v", r)
+	}
+}
+
+func TestGroupSides(t *testing.T) {
+	fs := func(name, locker string) frontline.Side { return frontline.Side{Name: name, Locker: locker} }
+	d := time.Date(2026, 10, 4, 18, 0, 0, 0, la)
+	for _, c := range []struct {
+		name       string
+		home, away frontline.Side
+		want       []side
+	}{
+		{"game", fs("12U LAHA", "4"), fs("10U LAHA", "3"),
+			[]side{{"12U LAHA", []chip{{"4", "blue"}}}, {"10U LAHA", []chip{{"3", "blue"}}}}},
+		{"one event", fs("Public Skate", ""), fs("Public Skate", ""), []side{{Name: "Public Skate"}}},
+		{"away is detail", fs("RBL Practice", "10"), fs("10/12U", ""), []side{{"RBL Practice 10/12U", []chip{{"10", "red"}}}}},
+		{"blank away", fs("14U LAHA", "5 & 6"), frontline.Side{}, []side{{"14U LAHA", []chip{{"5 & 6", "red"}}}}},
+		{"lockers to come", fs("16U", ""), fs("Kraken", ""), []side{{Name: "16U"}, {Name: "Kraken"}}},
+		{"blank home", frontline.Side{}, fs("B", "5"), []side{{"B", []chip{{"5", "red"}}}}},
+	} {
+		got := group([]frontline.Event{{Start: d, End: d.Add(time.Hour), Surface: "Big Sheet", Home: c.home, Away: c.away}}, d, false)
+		if r := got[0].Rows[0]; !reflect.DeepEqual(r.Sides, c.want) {
+			t.Errorf("%s: %+v, want %+v", c.name, r.Sides, c.want)
+		}
+	}
+}
+
+// Lockers 1-4 are blue and 5 and up red, whichever side they're listed on.
+func TestChips(t *testing.T) {
+	for in, want := range map[string][]chip{
+		"":      nil,
+		"2":     {{"2", "blue"}},
+		"4":     {{"4", "blue"}},
+		"5":     {{"5", "red"}},
+		"11":    {{"11", "red"}},
+		"2 & 3": {{"2 & 3", "blue"}},
+		"8&5":   {{"8 & 5", "red"}},
+		"4 & 5": {{"4", "blue"}, {"5", "red"}}, // both sides of the rink
+		"6, 3":  {{"6", "red"}, {"3", "blue"}},
+		"TBD":   {{"TBD", ""}}, // as given, uncolored
+		"0":     {{"0", ""}},
+	} {
+		if got := chips(in); !reflect.DeepEqual(got, want) {
+			t.Errorf("chips(%q) = %+v, want %+v", in, got, want)
+		}
+	}
+}
+
+func TestGroupGapShowsNextAsNow(t *testing.T) {
+	at := func(h, m int) time.Time { return time.Date(2026, 10, 4, h, m, 0, 0, la) }
+	events := []frontline.Event{
+		{Start: at(16, 45), End: at(17, 45), Surface: "Mini Sheet", Home: frontline.Side{Name: "A"}},
+		{Start: at(18, 0), End: at(19, 0), Surface: "Mini Sheet", Home: frontline.Side{Name: "B"}},
+		{Start: at(19, 15), End: at(20, 15), Surface: "Mini Sheet", Home: frontline.Side{Name: "C"}},
+	}
+	for _, c := range []struct {
+		now   time.Time
+		today bool
+		want  []string
+	}{
+		{at(17, 50), true, []string{"past", "now", ""}},      // between A and B
+		{at(18, 30), true, []string{"past", "now", ""}},      // B on
+		{at(16, 0), true, []string{"", "", ""}},              // before the first
+		{at(20, 30), true, []string{"past", "past", "past"}}, // after the last
+		{at(17, 50), false, []string{"", "", ""}},            // another day's page
+	} {
+		var got []string
+		for _, r := range group(events, c.now, c.today)[1].Rows {
+			got = append(got, r.State)
+		}
+		if !slices.Equal(got, c.want) {
+			t.Errorf("at %s (today %t): %q, want %q", c.now.Format("3:04 PM"), c.today, got, c.want)
+		}
 	}
 }

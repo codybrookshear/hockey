@@ -13,6 +13,8 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"hockey/internal/cache"
@@ -116,9 +118,46 @@ type sheet struct {
 
 type row struct {
 	Start, End string // "7:15", "8:45 AM"; Start has AM/PM only when End's differs
-	Home, Away frontline.Side
-	Same       bool   // one event in both columns, like public skate: shown as Home
+	Sides      []side // home then away, or just one for an event like public skate
 	State      string // "past" or "now", on today's page
+}
+
+type side struct {
+	Name    string
+	Lockers []chip
+}
+
+// chip is one or more lockers on the same side of the rink: 1–4 are on one
+// side (blue), 5 and up on the other (red). That, not home or away, is what
+// tells a team where to go.
+type chip struct {
+	Label string // "2 & 3", after a locker icon
+	Class string // "blue" or "red"; "" for a locker that isn't a number
+}
+
+// chips reads a locker cell ("2", "2 & 3", "8&5") as a chip per side of the
+// rink, in the cell's order. Anything else is shown as given, uncolored.
+func chips(lockers string) []chip {
+	if lockers == "" {
+		return nil
+	}
+	var out []chip
+	for _, f := range strings.FieldsFunc(lockers, func(r rune) bool { return r == '&' || r == ',' || r == ' ' }) {
+		n, err := strconv.Atoi(f)
+		if err != nil || n < 1 {
+			return []chip{{Label: lockers}}
+		}
+		class := "red"
+		if n <= 4 {
+			class = "blue"
+		}
+		if i := slices.IndexFunc(out, func(c chip) bool { return c.Class == class }); i >= 0 {
+			out[i].Label += " & " + f
+		} else {
+			out = append(out, chip{Label: f, Class: class})
+		}
+	}
+	return out
 }
 
 func (s *Server) schedule(w http.ResponseWriter, r *http.Request) {
@@ -192,14 +231,27 @@ func group(events []frontline.Event, now time.Time, today bool) []sheet {
 			out = append(out, sheet{Name: e.Surface})
 			i = len(out) - 1
 		}
-		r := row{Home: e.Home, Away: e.Away}
-		if e.Home.Name == e.Away.Name { // one event, maybe with a locker on one side only
-			r.Same = true
-			if a := e.Away.Locker; a != "" && a != r.Home.Locker {
-				if r.Home.Locker != "" {
-					a = r.Home.Locker + ", " + a
+		var r row
+		home, away := e.Home, e.Away
+		sides := []frontline.Side{home, away}
+		switch {
+		case home.Name == away.Name: // one event, maybe with a locker on one side only
+			if a := away.Locker; a != "" && a != home.Locker {
+				if home.Locker != "" {
+					a = home.Locker + " & " + a
 				}
-				r.Home.Locker = a
+				home.Locker = a
+			}
+			sides = []frontline.Side{home}
+		case home.Locker != "" && away.Locker == "": // away is the event's detail: "RBL Practice", "10/12U"
+			if away.Name != "" {
+				home.Name += " " + away.Name
+			}
+			sides = []frontline.Side{home}
+		}
+		for _, sd := range sides {
+			if sd != (frontline.Side{}) { // not a blank cell
+				r.Sides = append(r.Sides, side{Name: sd.Name, Lockers: chips(sd.Locker)})
 			}
 		}
 		r.Start, r.End = e.Start.Format("3:04"), e.End.Format("3:04 PM")
@@ -215,6 +267,13 @@ func group(events []frontline.Event, now time.Time, today bool) []sheet {
 			}
 		}
 		out[i].Rows = append(out[i].Rows, r)
+	}
+	if today { // between two events on a sheet, the next one is shown as on now
+		for _, s := range out {
+			if k := slices.IndexFunc(s.Rows, func(r row) bool { return r.State != "past" }); k > 0 && s.Rows[k].State == "" {
+				s.Rows[k].State = "now"
+			}
+		}
 	}
 	return out
 }
