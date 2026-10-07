@@ -19,6 +19,7 @@
 set -euo pipefail
 
 DEST="${DEST:-finance}"
+PLATFORM="${PLATFORM:-linux/amd64}" # the droplet's, whatever this machine is
 APPS=(schedule rhl)
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -40,7 +41,7 @@ images=()
 for a in "${apps[@]}"; do
   echo "Building hockey-$a:$version..."
   git archive --format=tar HEAD |
-    docker build -q --build-arg CMD="$a" \
+    docker build -q --platform "$PLATFORM" --build-arg CMD="$a" \
       --label org.opencontainers.image.revision="$(git rev-parse HEAD)" \
       -t "hockey-$a:$version" - >/dev/null
   images+=("hockey-$a:$version")

@@ -31,6 +31,13 @@ for a in "$@"; do [[ -n "${socket[$a]:-}" ]] || die "unknown app: $a"; done
 
 echo "Loading images..."
 gunzip -c "$SRC/images.tar.gz" | docker load -q
+# Before anything changes: an image built for another platform (an arm64 Mac's,
+# say) would replace the running site with one that can't start.
+arch="$(docker version --format '{{.Server.Arch}}')"
+for a in "$@"; do
+  got="$(docker image inspect --format '{{.Architecture}}' "hockey-$a:$VERSION")"
+  [[ "$got" == "$arch" ]] || die "hockey-$a:$VERSION is built for $got, but this machine is $arch"
+done
 
 # Versions: the new one for the apps being deployed; the others keep theirs.
 declare -A ver=()
