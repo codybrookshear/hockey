@@ -6,7 +6,7 @@
   {{if .HasLogo}}<img class="logo big" src="/logo/{{.Team.ID}}" alt="" width="56" height="56">{{else}}<span class="logo big initial" aria-hidden="true">{{initial .Team.Title}}</span>{{end}}
   <div>
     <h1>{{.Team.Title}}</h1>
-    <p class="sub">{{with .Standing}}{{ordinal .Rank}} in the {{end}}{{.Division}}</p>
+    <p class="sub">{{with .Standing}}{{with .Rank}}{{ordinal .}} in the {{end}}{{end}}{{.Division}}</p>
   </div>
 </section>
 
@@ -50,5 +50,5 @@
 </section>
 {{- end}}
 {{- end}}
-<p class="back"><a href="/">‹ Standings</a></p>
+<p class="back"><a href="{{.Back}}">‹ Standings</a></p>
 {{end}}

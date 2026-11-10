@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -29,33 +30,64 @@ var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 
 // The saved responses (gamesheet/testdata, from 2026-10-04 evening), served
 // at GameSheet's paths to a real client.
-func savedGameSheet(t *testing.T) *countingSource {
+func savedGameSheet(t *testing.T) *countingSource { return savedGameSheetWith(t, nil) }
+
+// winterGameSheet is GameSheet on 2026-11-10, in the week between seasons:
+// Fall 2026 (as saved on 10-04) not quite over, and Winter 2026/27 (16530)
+// started, with standings, rosters and no games played.
+func winterGameSheet(t *testing.T) *countingSource {
+	return savedGameSheetWith(t, map[string]string{
+		"/api/leagues/620287/seasons":    "league-seasons-620287-winter.json",
+		"/api/standings/16530":           "standings-16530.json",
+		"/api/unified-games/16530":       `{"data":[],"meta":{"total":0}}`,
+		"/api/players/standings/16530":   `{"status":"success","data":[]}`,
+		"/api/goalies/standings/16530":   `{"status":"success","data":[]}`,
+		"/api/teams/16530/587702/roster": "roster-16530-587702.json",
+		"/api/teams/16530/591206/roster": "", // not saved: unavailable
+		"/api/teams/15331/554799/roster": "roster-15331-554799.json",
+		"/api/unified-games/10561":       `{"data":[],"meta":{"total":0}}`,
+		"/api/standings/10561":           `{"status":"success","data":[]}`,
+		"/api/players/standings/10561":   `{"status":"success","data":[]}`,
+		"/api/goalies/standings/10561":   `{"status":"success","data":[]}`,
+	})
+}
+
+// savedGameSheetWith serves the saved responses, with more: a path's saved
+// file, or a body ("{..."), or "" for a 404.
+func savedGameSheetWith(t *testing.T, more map[string]string) *countingSource {
 	t.Helper()
 	files := map[string]string{
-		"/api/season-info/15331":       "season-info-15331.json",
-		"/api/leagues/620287/seasons":  "league-seasons-620287.json",
-		"/api/standings/15331":         "standings-15331.json",
-		"/api/unified-games/15331":     "unified-games-15331.json",
-		"/api/goalies/standings/15331": "goalies-15331.json",
+		"/api/season-info/15331":         "season-info-15331.json",
+		"/api/leagues/620287/seasons":    "league-seasons-620287.json",
+		"/api/standings/15331":           "standings-15331.json",
+		"/api/unified-games/15331":       "unified-games-15331.json",
+		"/api/goalies/standings/15331":   "goalies-15331.json",
+		"/api/teams/15331/554799/roster": "roster-15331-554799.json",
+	}
+	for k, v := range more {
+		files[k] = v
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		name, ok := files[r.URL.Path]
 		if r.URL.Path == "/api/players/standings/15331" {
 			name, ok = "players-15331-"+r.URL.Query().Get("offset")+".json", true
 		}
-		if !ok {
+		if !ok || name == "" {
 			http.NotFound(w, r)
 			return
 		}
-		b, err := os.ReadFile("../gamesheet/testdata/" + name)
-		if err != nil {
-			t.Error(err)
+		b := []byte(name)
+		if !strings.HasPrefix(name, "{") {
+			var err error
+			if b, err = os.ReadFile("../gamesheet/testdata/" + name); err != nil {
+				t.Error(err)
+			}
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(b)
 	}))
 	t.Cleanup(srv.Close)
-	return &countingSource{Source: &gamesheet.Client{HTTP: srv.Client(), BaseURL: srv.URL}, calls: map[string]int{}}
+	return &countingSource{Source: &gamesheet.Client{HTTP: srv.Client(), BaseURL: srv.URL, Location: la}, calls: map[string]int{}}
 }
 
 // countingSource counts calls, and can be made to fail.
@@ -115,6 +147,13 @@ func (c *countingSource) Standings(ctx context.Context, id int) ([]gamesheet.Div
 		return nil, err
 	}
 	return c.Source.Standings(ctx, id)
+}
+
+func (c *countingSource) Roster(ctx context.Context, season, team int) (gamesheet.Roster, error) {
+	if err := c.note("roster"); err != nil {
+		return gamesheet.Roster{}, err
+	}
+	return c.Source.Roster(ctx, season, team)
 }
 
 func (c *countingSource) Games(ctx context.Context, id int) ([]gamesheet.Game, error) {
@@ -215,9 +254,10 @@ func TestHome(t *testing.T) {
 	}
 
 	// The season came from the league's list; everything is fetched once.
+	// Standings twice: Spring's too, looking for a logo for Rogue.
 	get(t, h, "/")
 	get(t, h, "/team/554802")
-	for what, want := range map[string]int{"league seasons": 1, "season": 0, "standings": 1, "games": 1, "skaters": 1, "goalies": 1} {
+	for what, want := range map[string]int{"league seasons": 1, "season": 0, "standings": 2, "games": 1, "skaters": 1, "goalies": 1, "roster": 1} {
 		if got := src.count(what); got != want {
 			t.Errorf("%s fetched %d times, want %d", what, got, want)
 		}
@@ -230,8 +270,9 @@ func TestConfiguredSeason(t *testing.T) {
 	if w := get(t, h, "/"); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Fall 2026") {
 		t.Errorf("GET /: %d", w.Code)
 	}
-	if src.count("season") != 1 || src.count("league seasons") != 0 {
-		t.Errorf("calls: %v (want the configured season only)", src.calls)
+	// The league's seasons too, for the menu.
+	if src.count("season") != 1 || src.count("league seasons") != 1 {
+		t.Errorf("calls: %v", src.calls)
 	}
 	if _, err := New(Config{Source: src, Location: la, Log: quiet}); err == nil {
 		t.Error("New accepted neither Season nor League")
@@ -373,6 +414,8 @@ func TestPlayerName(t *testing.T) {
 		{"Gallen", "Pierce-Lackey"}: "Gallen Pierce-Lackey",
 		{"JJ", "McDonald"}:          "JJ McDonald",
 		{" ANNA ", " LEE "}:         "Anna Lee",
+		{"ROBERT", "ARNOLD IV"}:     "Robert Arnold IV",
+		{"IVAN", "IVES"}:            "Ivan Ives",
 	} {
 		if got := playerName(gamesheet.Player{First: in[0], Last: in[1]}); got != want {
 			t.Errorf("%q: got %q, want %q", in, got, want)
@@ -397,7 +440,7 @@ func TestScorersRosterGoalies(t *testing.T) {
 	}
 
 	everyone := func(int) bool { return true }
-	got := scorers(all, everyone)
+	got := scorers(all, everyone, links{})
 	// STAR and SUB tie on points; STAR has more goals. Then 14 tied at 1:
 	// cut at scorersMax.
 	if got[0].Name != "A Star" || got[1].Name != "A Sub" || got[1].Rank != 1 || got[1].Team != "ONE/TWO" ||
@@ -405,30 +448,45 @@ func TestScorersRosterGoalies(t *testing.T) {
 		t.Errorf("scorers: %+v", got[:3])
 	}
 	// A division of team 2 only: SUB counts their games for TWO.
-	if two := scorers(all, func(id int) bool { return id == 2 }); two[0].Name != "A Sub" || two[0].PTS != 4 || two[0].Team != "TWO" {
+	if two := scorers(all, func(id int) bool { return id == 2 }, links{season: 7}); two[0].TeamHref != "/team/2?season=7" || two[0].Name != "A Sub" || two[0].PTS != 4 || two[0].Team != "TWO" {
 		t.Errorf("division scorers: %+v", two[0])
 	}
-	one := roster(all, 1)
-	// SUB's stats for this team only; OLD (no games) left out.
+	one := teamSkaters(nil, all, 1)
+	// No roster: who's played. SUB's stats for this team only; OLD (no games) left out.
 	if len(one) != 2 || one[0].Name != "A Star" || one[1].PTS != 2 || one[1].Team != "" {
-		t.Errorf("roster: %+v", one)
+		t.Errorf("players: %+v", one)
+	}
+	// The roster: OLD and a new player, yet to play, by name; SUB (not on
+	// it) still there.
+	newbie := gamesheet.Skater{Player: gamesheet.Player{ID: 99, First: "A", Last: "NEW"}, Teams: []gamesheet.SkaterTeam{team(1, "ONE", line(0, 0, 0))}}
+	one = teamSkaters([]gamesheet.Skater{all[2], newbie, all[1]}, all, 1)
+	var names []string
+	for _, s := range one {
+		names = append(names, s.Name)
+	}
+	if fmt.Sprint(names) != "[A Star A Sub A New A Old]" {
+		t.Errorf("roster: %v", names)
 	}
 
 	gl := []gamesheet.Goalie{
-		{Player: gamesheet.Player{First: "a", Last: "busy"}, GoalieLine: gamesheet.GoalieLine{GP: 4, SVPct: .9},
+		{Player: gamesheet.Player{ID: 1, First: "a", Last: "busy"}, GoalieLine: gamesheet.GoalieLine{GP: 4, SVPct: .9},
 			Teams: []gamesheet.GoalieTeam{{Team: gamesheet.Team{ID: 1, Abbr: "ONE"}, GoalieLine: gamesheet.GoalieLine{GP: 2, SVPct: .95}},
 				{Team: gamesheet.Team{ID: 2, Abbr: "TWO"}, GoalieLine: gamesheet.GoalieLine{GP: 2, SVPct: .85}}}},
-		{Player: gamesheet.Player{First: "b", Last: "best"}, GoalieLine: gamesheet.GoalieLine{GP: 1, SVPct: .93},
+		{Player: gamesheet.Player{ID: 2, First: "b", Last: "best"}, GoalieLine: gamesheet.GoalieLine{GP: 1, SVPct: .93},
 			Teams: []gamesheet.GoalieTeam{{Team: gamesheet.Team{ID: 2, Abbr: "TWO"}, GoalieLine: gamesheet.GoalieLine{GP: 1, SVPct: .93}}}},
-		{Player: gamesheet.Player{First: "c", Last: "bench"},
+		{Player: gamesheet.Player{ID: 3, First: "c", Last: "bench"},
 			Teams: []gamesheet.GoalieTeam{{Team: gamesheet.Team{ID: 1, Abbr: "ONE"}}}},
 	}
 	// A row per goalie and team they played for; none for the benchwarmer.
-	if g := goalies(gl, everyone, true); len(g) != 3 || g[0].SVPct != .95 || g[0].Team != "ONE" || g[1].Name != "B Best" || g[2].Team != "TWO" {
+	if g := goalies(gl, everyone, &links{}); len(g) != 3 || g[0].SVPct != .95 || g[0].Team != "ONE" || g[1].Name != "B Best" || g[2].Team != "TWO" {
 		t.Errorf("league goalies: %+v", g)
 	}
-	if g := goalies(gl, func(id int) bool { return id == 1 }, false); len(g) != 1 || g[0].SVPct != .95 || g[0].Team != "" {
+	if g := goalies(gl, func(id int) bool { return id == 1 }, nil); len(g) != 1 || g[0].SVPct != .95 || g[0].Team != "" {
 		t.Errorf("team goalies (that team's line, no team label): %+v", g)
+	}
+	// With a roster: the benchwarmer too, after those who've played.
+	if g := teamGoalies(gl[2:], gl, 1); len(g) != 2 || g[0].Name != "A Busy" || g[1].Name != "C Bench" || g[1].GP != 0 {
+		t.Errorf("team goalies with a roster: %+v", g)
 	}
 }
 
@@ -480,5 +538,159 @@ func TestDivisionToggle(t *testing.T) {
 	h = newServer(t, Config{Source: savedGameSheet(t), Season: 15331, SecureCookies: true})
 	if c := get(t, h, "/?division=82590").Result().Cookies(); len(c) != 1 || !c[0].Secure {
 		t.Errorf("production cookie: %+v", c)
+	}
+}
+
+// The week between seasons: Winter has started, Fall hasn't finished.
+var nov10 = func() time.Time { return time.Date(2026, 11, 10, 12, 0, 0, 0, la) }
+
+func TestSeasonMenu(t *testing.T) {
+	src := winterGameSheet(t)
+	h := newServer(t, Config{Source: src, League: 620287, Now: nov10})
+
+	// The current season: Winter, standings at 0-0 before anyone plays.
+	w := get(t, h, "/?division=90095")
+	b := w.Body.String()
+	for _, want := range []string{
+		"<title>RHL · Winter 2026/27</title>",
+		`<summary><span class="vh">Season: </span>Winter 2026/27</summary>`,
+		// Latest first; the current one at plain /.
+		`<li><a href="/" aria-current="page">Winter 2026/27</a></li>`,
+		`<li><a href="/?season=15331">Fall 2026</a></li>`,
+		`<li><a href="/?season=10561">Spring 2026</a></li>`,
+		"<h2>Standings</h2>",
+		`<td class="rank">–</td>`, // no rank yet
+		`<a href="/team/591206">Renegades</a>`,
+		`<a href="/?division=90096">Apollo</a>`,
+	} {
+		if !strings.Contains(b, want) {
+			t.Errorf("winter lacks %q", want)
+		}
+	}
+	if strings.Index(b, "Winter 2026/27</a>") > strings.Index(b, "Fall 2026</a>") || strings.Contains(b, `class="past"`) {
+		t.Error("menu out of order, or the current season marked as earlier")
+	}
+	if strings.Contains(b, "class=\"problem\"") {
+		t.Errorf("problems on a season with no games:\n%s", b)
+	}
+	if c := w.Result().Cookies(); len(c) != 1 || c[0].Value != "90095" {
+		t.Errorf("cookie: %+v", c)
+	}
+
+	// Fall, picked from the menu: every link keeps it; the division isn't
+	// remembered (next season's are different).
+	w = get(t, h, "/?season=15331&division=82590")
+	b = w.Body.String()
+	for _, want := range []string{
+		"<title>RHL · Fall 2026</title>",
+		`<li><a href="/?season=15331" aria-current="page">Fall 2026</a></li>`,
+		`<p class="past">An earlier season. <a href="/">Back to Winter 2026/27 ›</a></p>`,
+		`<a href="/?division=82590&amp;season=15331" aria-current="page">B/C Division</a>`,
+		`<a href="/team/554802?season=15331">Ice Dogs</a>`,
+		"https://gamesheetstats.com/seasons/15331",
+	} {
+		if !strings.Contains(b, want) {
+			t.Errorf("fall lacks %q", want)
+		}
+	}
+	if w.Code != http.StatusOK || w.Header().Get("Set-Cookie") != "" {
+		t.Errorf("fall: %d, cookie %q", w.Code, w.Header().Get("Set-Cookie"))
+	}
+	// Plain links keep to the current season.
+	if b := get(t, h, "/team/554802").Body.String(); !strings.Contains(b, "no such team this season") {
+		t.Error("a fall team on the current season's page")
+	}
+	// Only the league's seasons.
+	for _, p := range []string{"/?season=99", "/team/554802?season=99"} {
+		if w := get(t, h, p); w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "no such RHL season") {
+			t.Errorf("GET %s: %d", p, w.Code)
+		}
+	}
+	// Winter's and Fall's (and Winter's again, for Fall's Rogue's logo); nothing for season 99.
+	if src.count("standings") != 3 || src.count("league seasons") != 1 {
+		t.Errorf("calls: %v", src.calls)
+	}
+	// Junk is the current season.
+	if b := get(t, h, "/?season=abc").Body.String(); !strings.Contains(b, "<title>RHL · Winter 2026/27</title>") {
+		t.Error("?season=abc")
+	}
+}
+
+func TestRosters(t *testing.T) {
+	src := winterGameSheet(t)
+	h := newServer(t, Config{Source: src, League: 620287, Now: nov10})
+
+	// A new season's team: its roster, before anyone has played; ranked by hand.
+	b := get(t, h, "/team/587702").Body.String()
+	for _, want := range []string{
+		"<h1>White Lightning</h1>", "1st in the Apollo", "<dd>0-0-0</dd>", "<h2>Players</h2>",
+		`<td class="who">Robert Arnold IV</td>`, `<td class="who">Jeremy Young</td>`,
+		`<p class="back"><a href="/?division=90096">‹ Standings</a></p>`,
+	} {
+		if !strings.Contains(b, want) {
+			t.Errorf("winter team lacks %q", want)
+		}
+	}
+	if strings.Index(b, "Arnold IV") > strings.Index(b, "Fedderly") || strings.Contains(b, `class="problem"`) {
+		t.Error("roster not by name, or a problem shown")
+	}
+	// Unranked: no "th in the". Roster unavailable: say so.
+	b = get(t, h, "/team/591206").Body.String()
+	if !strings.Contains(b, `<p class="sub">Bravo</p>`) || !strings.Contains(b, "get the roster") {
+		t.Errorf("unranked team without a roster:\n%s", b)
+	}
+
+	// Last season's team, with its goalie.
+	b = get(t, h, "/team/554799?season=15331").Body.String()
+	for _, want := range []string{
+		"<h1>Oakshire</h1>", `<td class="who">Jonathan Gunther</td>`, "<h2>Goalies</h2>", `<td class="who">Paul Wanke</td>`,
+		`<p class="back"><a href="/?division=82590&amp;season=15331">‹ Standings</a></p>`,
+	} {
+		if !strings.Contains(b, want) {
+			t.Errorf("fall team lacks %q", want)
+		}
+	}
+	// Opponents' links keep the season.
+	if all, kept := strings.Count(b, `href="/team/`), regexp.MustCompile(`href="/team/\d+\?season=15331"`).FindAllString(b, -1); all == 0 || len(kept) != all {
+		t.Errorf("%d team links, %d keep the season", all, len(kept))
+	}
+	get(t, h, "/team/587702")
+	if src.count("roster") != 3 {
+		t.Errorf("roster fetched %d times, want 3 (cached)", src.count("roster"))
+	}
+}
+
+// Fall's Rogue has no logo on GameSheet; Winter's Rogue has one.
+func TestBorrowedLogo(t *testing.T) {
+	src := winterGameSheet(t)
+	logos := &logoLog{}
+	h := newServer(t, Config{Source: src, League: 620287, Now: nov10, Logo: logos.fetch})
+
+	for range 3 {
+		b := get(t, h, "/?season=15331&division=82591").Body.String()
+		if !strings.Contains(b, `<img class="logo" src="/logo/554807"`) {
+			t.Fatal("Fall's Rogue has no logo")
+		}
+	}
+	if w := get(t, h, "/logo/554807"); w.Code != http.StatusOK ||
+		len(logos.urls) != 1 || !strings.Contains(logos.urls[0], "f08e63df-d273-473b-a78f-bca21e49a200") {
+		t.Errorf("logo: %d, fetched %v (want Winter's Rogue's)", w.Code, logos.urls)
+	}
+	// Winter's standings once for the page (Fall's), once for logos; Spring's
+	// not needed.
+	if n := src.count("standings"); n != 2 {
+		t.Errorf("standings fetched %d times, want 2", n)
+	}
+	// Teams that have their own aren't touched.
+	if b := get(t, h, "/?season=15331&division=82591").Body.String(); !strings.Contains(b, `<img class="logo" src="/logo/554805"`) {
+		t.Error("Pirates lost their logo")
+	}
+}
+
+func TestTeamKey(t *testing.T) {
+	for in, want := range map[string]string{"Nova Cains": "novacains", "Novacains": "novacains", "Black Berry Benders": "blackberrybenders", "Kelly's Heroes": "kellysheroes", "  ": ""} {
+		if got := teamKey(in); got != want {
+			t.Errorf("teamKey(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

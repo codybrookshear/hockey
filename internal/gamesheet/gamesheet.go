@@ -9,6 +9,7 @@
 package gamesheet
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -53,7 +54,7 @@ type Division struct {
 
 // Standing is a team's line in its division, as GameSheet ranks it.
 type Standing struct {
-	Rank                   int
+	Rank                   int // 0: not ranked yet (no games)
 	Team                   Team
 	GP, W, L, T, OTL       int
 	PTS, GF, GA, Diff      int
@@ -116,6 +117,9 @@ type Client struct {
 	HTTP      *http.Client
 	BaseURL   string // DefaultBaseURL
 	UserAgent string
+	// Location is the league's time zone, where its games' local times are.
+	// nil = UTC (tests).
+	Location *time.Location
 }
 
 func (c *Client) Season(ctx context.Context, id int) (Season, error) {
@@ -177,7 +181,8 @@ func (c *Client) Standings(ctx context.Context, season int) ([]Division, error) 
 					ID    int    `json:"id"`
 					Title string `json:"title"`
 				} `json:"division"`
-				Rank   int    `json:"rank"`
+				Rank *int `json:"rank"` // null before a team's first game, sometimes
+
 				Reason string `json:"reason"`
 				// Keys are GameSheet's abbreviations: GP, W, L, T, OTL, PTS…
 				Stats struct {
@@ -211,12 +216,19 @@ func (c *Client) Standings(ctx context.Context, season int) ([]Division, error) 
 					return nil, fmt.Errorf("standings: %q is missing a stat (the response changed shape)", s.Team.Title)
 				}
 			}
-			if s.Team.ID == 0 || s.Team.Title == "" || s.Rank < 1 || s.Division.ID != d.DivisionID {
+			// A new season's teams have no rank until they play (unless
+			// ranked by hand); anyone who has played does.
+			rank := 0
+			if s.Rank != nil {
+				rank = *s.Rank
+			}
+			if s.Team.ID == 0 || s.Team.Title == "" || s.Division.ID != d.DivisionID ||
+				(s.Rank != nil && rank < 1) || (s.Rank == nil && *st.GP != 0) {
 				return nil, errors.New("standings: unexpected team entry (the response changed shape)")
 			}
 			div.Title = s.Division.Title
 			div.Teams = append(div.Teams, Standing{
-				Rank: s.Rank,
+				Rank: rank,
 				Team: Team{ID: s.Team.ID, Title: s.Team.Title, Abbr: s.Team.Abbr, Logo: s.Team.Logo},
 				GP:   *st.GP, W: *st.W, L: *st.L, T: *st.T, OTL: *st.OTL,
 				PTS: *st.PTS, GF: *st.GF, GA: *st.GA, Diff: *st.DIFF, PIM: st.PIM,
@@ -226,8 +238,17 @@ func (c *Client) Standings(ctx context.Context, season int) ([]Division, error) 
 		if len(div.Teams) == 0 {
 			continue
 		}
-		// The response isn't always in rank order.
-		slices.SortStableFunc(div.Teams, func(a, b Standing) int { return a.Rank - b.Rank })
+		// The response isn't always in rank order. Unranked teams (no games
+		// yet) go last, by name.
+		slices.SortStableFunc(div.Teams, func(a, b Standing) int {
+			if (a.Rank == 0) != (b.Rank == 0) {
+				return cmp.Compare(b.Rank, a.Rank) // the unranked 0 last
+			}
+			if a.Rank == 0 {
+				return cmp.Compare(a.Team.Title, b.Team.Title)
+			}
+			return cmp.Compare(a.Rank, b.Rank)
+		})
 		divs = append(divs, div)
 	}
 	return divs, nil
@@ -257,7 +278,7 @@ func (c *Client) Games(ctx context.Context, season int) ([]Game, error) {
 			return nil, errors.New("games: no total (the response changed shape)")
 		}
 		for _, r := range body.Data {
-			g, err := r.game()
+			g, err := r.game(c.location())
 			if err != nil {
 				return nil, err
 			}
@@ -275,9 +296,14 @@ type rawGame struct {
 	Status   string `json:"status"`
 	GameType string `json:"gameType"`
 	Location string `json:"location"`
-	Start    string `json:"timeStampZulu"`
-	Home     rawSide
-	Visitor  rawSide
+	// The local date and time. GameSheet's UTC time (timeStampZulu) follows
+	// the league's zone setting there, America/Vancouver, which stays at
+	// UTC-7 from November 2026 (BC stopped changing clocks); the rink is in
+	// Washington, which falls back, so the UTC time is an hour early in winter.
+	Date    string `json:"date"` // "Nov 8, 2026"
+	Time    string `json:"time"` // "9:00 AM"
+	Home    rawSide
+	Visitor rawSide
 }
 
 type rawSide struct {
@@ -301,8 +327,15 @@ type rawSide struct {
 	} `json:"goalDetails"`
 }
 
-func (r rawGame) game() (Game, error) {
-	start, err := time.Parse(time.RFC3339, r.Start)
+func (c *Client) location() *time.Location {
+	if c.Location == nil {
+		return time.UTC
+	}
+	return c.Location
+}
+
+func (r rawGame) game(loc *time.Location) (Game, error) {
+	start, err := time.ParseInLocation("Jan 2, 2006 3:04 PM", r.Date+" "+r.Time, loc)
 	if err != nil || r.GameID == 0 || r.Status == "" || r.Home.Goals == nil || r.Visitor.Goals == nil {
 		return Game{}, fmt.Errorf("games: unexpected game entry %d (the response changed shape)", r.GameID)
 	}

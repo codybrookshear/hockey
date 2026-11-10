@@ -65,6 +65,54 @@ header.top {
 
 .season { color: var(--muted); font-weight: 600; }
 
+/* Season menu: a disclosure of links (no scripts), opening over the page. */
+details.seasons { position: relative; }
+details.seasons > summary {
+  color: var(--muted);
+  font-weight: 600;
+  padding: 0.3rem 0;
+}
+details.seasons > summary::after {
+  content: "";
+  display: inline-block;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin: 0 0 0.2rem 0.45rem;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  vertical-align: middle;
+}
+details.seasons[open] > summary::after { transform: rotate(225deg); margin-bottom: -0.1rem; }
+details.seasons ul {
+  position: absolute;
+  z-index: 1;
+  top: 100%;
+  left: 0;
+  min-width: 11rem;
+  margin: 0.2rem 0 0;
+  padding: 0.3rem 0;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.15);
+}
+details.seasons li a {
+  display: block;
+  padding: 0.55rem 0.9rem; /* a thumb-sized target */
+  color: var(--fg);
+  white-space: nowrap;
+}
+details.seasons li a[aria-current] { color: var(--accent); font-weight: 700; }
+
+/* On an earlier season: say so, with the way back. */
+.past {
+  margin: 0.8rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 main { padding-bottom: 1.5rem; }
 
 h1 { font-size: 1.4rem; margin: 0; }

@@ -3,10 +3,12 @@
 - `hockey.brookshear.party` (`cmd/schedule`, `internal/schedule`): The Rink Exchange's daily
   schedule from Frontline Connect (HTML, no API; `internal/frontline`), one table per sheet.
 - `rhl.brookshear.party` (`cmd/rhl`, `internal/rhl`): the RHL adult league from GameSheet's
-  undocumented JSON API (`internal/gamesheet`): a division toggle (remembered in a cookie)
-  filters standings, live, results with scorers, upcoming, scoring leaders and goalies; team
-  pages (unfiltered) with player stats; logos (server-cached; teams without one get their
-  initial, white on red).
+  undocumented JSON API (`internal/gamesheet`): a season menu in the header (the current
+  season at `/`, earlier ones at `?season=<id>`, carried in every link); a division toggle
+  (remembered in a cookie, current season only) filters standings, live, results with
+  scorers, upcoming, scoring leaders and goalies; team pages (unfiltered) with the roster and
+  its stats; logos (server-cached; a team without one borrows the logo of a same-named team
+  from another season, else gets its initial, white on red).
 
 Separate apps and containers by design (the user wants them separate sites). Shared:
 `internal/cache` (cache + per-source request limits) and `internal/serve` (listen, timeouts,
@@ -24,14 +26,20 @@ Phone-first (iPhone mini, 375px): check layouts at that width.
   challenges (GameSheet's pages have one; its API doesn't, today).
 - Every request to a source stays bounded however much traffic arrives: ≤20/min per
   source, one at a time, cached (schedule 10 min/day, RHL standings and games 3 min, player
-  and goalie stats 10 min, logos 1 day, current season 6 h). Schedule dates limited to
-  today −7…+120 days. Logos only from URLs in GameSheet's data, on imagedelivery.net, raster
-  types, ≤512 KB; no redirects followed.
+  and goalie stats and rosters 10 min, logos 1 day, the league's seasons 6 h). Schedule dates
+  limited to today −7…+120 days. Only the league's own seasons can be picked, and rosters
+  only for teams in a season's data. Logos only from URLs in GameSheet's data, on
+  imagedelivery.net, raster types, ≤512 KB; no redirects followed.
 - GameSheet endpoints used (`gamesheetstats.com/api/`): `leagues/{id}/seasons`,
   `season-info/{id}`, `standings/{season}`, `unified-games/{season}` (paged, has a total),
   `players/standings/{season}` and `goalies/standings/{season}` (paged by limit/offset, no
-  total). Found in the stats site's JavaScript; player stats are rendered server-side there,
-  so the browser's network tab doesn't show them.
+  total), `teams/{season}/{team}/roster` (players and goalies, before any games too). Found
+  in the stats site's JavaScript; player stats and rosters are rendered server-side there,
+  so the browser's network tab doesn't show them. A new season's standings have
+  `"rank": null` until teams play (some divisions are ranked by hand). Game times come from
+  the local `date` and `time`, read in HOCKEY_TZ: GameSheet's `timeStampZulu` follows the
+  league's zone there, America/Vancouver, which stays on UTC−7 from Nov 2026, so it's an hour
+  early for the Washington rink in winter.
 - RHL current season: league 620287's seasons, `is_active` first (dates in GameSheet have
   mistakes), else latest started. `RHL_SEASON` pins one.
 - Shares the droplet `app-01` with codybrookshear/finance: Compose project `hockey`

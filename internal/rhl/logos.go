@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"hockey/internal/gamesheet"
 )
@@ -71,6 +72,79 @@ func (s *Server) rememberLogos(st stats) {
 	for _, g := range st.Games {
 		add(g.Home.Team, true)
 		add(g.Visitor.Team, true)
+	}
+}
+
+// teamKey is a team's name for matching across seasons: letters and digits,
+// lower case ("Nova Cains" and "Novacains" are one team).
+func teamKey(title string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(title) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// borrowLogos finds logos for st's teams that have none in GameSheet's data,
+// from a team of the same name in the league's other seasons, latest first.
+// Each season's logos (from its standings) are cached for a day, and fetched
+// only while a team lacks one.
+func (s *Server) borrowLogos(ctx context.Context, st stats) {
+	missing := map[int]string{} // team ID → teamKey
+	s.mu.Lock()
+	note := func(t gamesheet.Team) {
+		if _, have := s.logoURLs[t.ID]; !have && t.ID != 0 && teamKey(t.Title) != "" {
+			missing[t.ID] = teamKey(t.Title)
+		}
+	}
+	for _, d := range st.Divisions {
+		for _, t := range d.Teams {
+			note(t.Team)
+		}
+	}
+	for _, g := range st.Games {
+		note(g.Home.Team)
+		note(g.Visitor.Team)
+	}
+	s.mu.Unlock()
+
+	for _, other := range st.Seasons { // latest first
+		if len(missing) == 0 {
+			return
+		}
+		if other.ID == st.Season.ID {
+			continue
+		}
+		id := other.ID
+		r := s.seasonLogos.Get(ctx, strconv.Itoa(id), func(ctx context.Context) (map[string]string, error) {
+			divs, err := s.cfg.Source.Standings(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			out := map[string]string{}
+			for _, d := range divs {
+				for _, t := range d.Teams {
+					if u, ok := logoURL(t.Team.Logo); ok && teamKey(t.Team.Title) != "" {
+						out[teamKey(t.Team.Title)] = u
+					}
+				}
+			}
+			return out, nil
+		})
+		if r.Err != nil {
+			s.cfg.Log.Warn("other season's logos unavailable", "season", id, "err", r.Err.Error())
+			continue
+		}
+		s.mu.Lock()
+		for team, key := range missing {
+			if u, ok := r.Value[key]; ok {
+				s.logoURLs[team] = u
+				delete(missing, team)
+			}
+		}
+		s.mu.Unlock()
 	}
 }
 

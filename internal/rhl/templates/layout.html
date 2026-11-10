@@ -18,9 +18,22 @@
 <body>
 <header class="top">
   <a class="brand" href="/">RHL</a>
+  {{- if .Seasons}}
+  {{/* A menu without scripts: a disclosure of links. */}}
+  <details class="seasons">
+    <summary><span class="vh">Season: </span>{{.Season.Name}}</summary>
+    <ul>
+      {{- range .Seasons}}
+      <li><a href="{{.Href}}"{{if .Selected}} aria-current="page"{{end}}>{{.Name}}</a></li>
+      {{- end}}
+    </ul>
+  </details>
+  {{- else}}
   {{with .Season.Name}}<span class="season">{{.}}</span>{{end}}
+  {{- end}}
 </header>
 <main>
+{{if .Past}}<p class="past">An earlier season. <a href="/">Back to {{or .Current "this season"}} ›</a></p>{{end}}
 {{range .Problems}}<p class="problem">{{.}}</p>{{end}}
 {{if .Stale}}<p class="problem">Couldn't reach GameSheet. These are the stats as of {{stamp .Fetched}}.</p>{{end}}
 {{template "content" .}}

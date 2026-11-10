@@ -66,7 +66,7 @@ func run(log *slog.Logger) error {
 		CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("unexpected redirect") },
 	}
 	srv, err := rhl.New(rhl.Config{
-		Source: &gamesheet.Client{HTTP: client, BaseURL: gamesheet.DefaultBaseURL, UserAgent: userAgent},
+		Source: &gamesheet.Client{HTTP: client, BaseURL: gamesheet.DefaultBaseURL, UserAgent: userAgent, Location: loc},
 		Season: season,
 		League: league,
 		Logo:   rhl.FetchLogo(client, userAgent),

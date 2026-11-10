@@ -81,6 +81,10 @@ func (fourDivisions) Goalies(context.Context, int) ([]gamesheet.Goalie, error) {
 	return out, nil
 }
 
+func (fourDivisions) Roster(context.Context, int, int) (gamesheet.Roster, error) {
+	return gamesheet.Roster{}, nil
+}
+
 func TestFourDivisions(t *testing.T) {
 	h := newServer(t, Config{Source: fourDivisions{}, League: 620287})
 	b := get(t, h, "/").Body.String()
