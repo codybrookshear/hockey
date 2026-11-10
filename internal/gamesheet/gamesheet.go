@@ -117,6 +117,9 @@ type Client struct {
 	HTTP      *http.Client
 	BaseURL   string // DefaultBaseURL
 	UserAgent string
+	// Location is the league's time zone, where its games' local times are.
+	// nil = UTC (tests).
+	Location *time.Location
 }
 
 func (c *Client) Season(ctx context.Context, id int) (Season, error) {
@@ -275,7 +278,7 @@ func (c *Client) Games(ctx context.Context, season int) ([]Game, error) {
 			return nil, errors.New("games: no total (the response changed shape)")
 		}
 		for _, r := range body.Data {
-			g, err := r.game()
+			g, err := r.game(c.location())
 			if err != nil {
 				return nil, err
 			}
@@ -293,9 +296,14 @@ type rawGame struct {
 	Status   string `json:"status"`
 	GameType string `json:"gameType"`
 	Location string `json:"location"`
-	Start    string `json:"timeStampZulu"`
-	Home     rawSide
-	Visitor  rawSide
+	// The local date and time. GameSheet's UTC time (timeStampZulu) follows
+	// the league's zone setting there, America/Vancouver, which stays at
+	// UTC-7 from November 2026 (BC stopped changing clocks); the rink is in
+	// Washington, which falls back, so the UTC time is an hour early in winter.
+	Date    string `json:"date"` // "Nov 8, 2026"
+	Time    string `json:"time"` // "9:00 AM"
+	Home    rawSide
+	Visitor rawSide
 }
 
 type rawSide struct {
@@ -319,8 +327,15 @@ type rawSide struct {
 	} `json:"goalDetails"`
 }
 
-func (r rawGame) game() (Game, error) {
-	start, err := time.Parse(time.RFC3339, r.Start)
+func (c *Client) location() *time.Location {
+	if c.Location == nil {
+		return time.UTC
+	}
+	return c.Location
+}
+
+func (r rawGame) game(loc *time.Location) (Game, error) {
+	start, err := time.ParseInLocation("Jan 2, 2006 3:04 PM", r.Date+" "+r.Time, loc)
 	if err != nil || r.GameID == 0 || r.Status == "" || r.Home.Goals == nil || r.Visitor.Goals == nil {
 		return Game{}, fmt.Errorf("games: unexpected game entry %d (the response changed shape)", r.GameID)
 	}

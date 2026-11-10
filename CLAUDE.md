@@ -36,7 +36,10 @@ Phone-first (iPhone mini, 375px): check layouts at that width.
   total), `teams/{season}/{team}/roster` (players and goalies, before any games too). Found
   in the stats site's JavaScript; player stats and rosters are rendered server-side there,
   so the browser's network tab doesn't show them. A new season's standings have
-  `"rank": null` until teams play (some divisions are ranked by hand).
+  `"rank": null` until teams play (some divisions are ranked by hand). Game times come from
+  the local `date` and `time`, read in HOCKEY_TZ: GameSheet's `timeStampZulu` follows the
+  league's zone there, America/Vancouver, which stays on UTC−7 from Nov 2026, so it's an hour
+  early for the Washington rink in winter.
 - RHL current season: league 620287's seasons, `is_active` first (dates in GameSheet have
   mistakes), else latest started. `RHL_SEASON` pins one.
 - Shares the droplet `app-01` with codybrookshear/finance: Compose project `hockey`

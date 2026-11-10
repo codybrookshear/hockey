@@ -56,7 +56,7 @@ func fakeGameSheet(t *testing.T, override map[string]string) (*Client, *[]string
 		w.Write(b)
 	}))
 	t.Cleanup(srv.Close)
-	return &Client{HTTP: srv.Client(), BaseURL: srv.URL, UserAgent: "test-agent"}, &paths
+	return &Client{HTTP: srv.Client(), BaseURL: srv.URL, UserAgent: "test-agent", Location: pacific}, &paths
 }
 
 func TestSeason(t *testing.T) {
@@ -168,13 +168,42 @@ func TestGames(t *testing.T) {
 	}
 }
 
+var pacific = func() *time.Location {
+	l, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		panic(err)
+	}
+	return l
+}()
+
+// GameSheet's UTC times follow America/Vancouver, which stays at UTC-7
+// from November 2026; the rink's zone falls back to UTC-8. Nov 8's 9:00 AM
+// game says 16:00 UTC, and is at 17:00.
+func TestGamesAfterDaylightTime(t *testing.T) {
+	c, _ := fakeGameSheet(t, nil)
+	games, err := c.Games(context.Background(), 15331)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, g := range games {
+		found = found || g.Start.Equal(time.Date(2026, 11, 8, 17, 0, 0, 0, time.UTC))
+		if g.Start.Equal(time.Date(2026, 11, 8, 16, 0, 0, 0, time.UTC)) {
+			t.Errorf("game %d at GameSheet's UTC time", g.ID)
+		}
+	}
+	if !found {
+		t.Error("no game at 9:00 AM PST on Nov 8")
+	}
+}
+
 func TestGamesPages(t *testing.T) {
 	var offsets []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		off := r.URL.Query().Get("offset")
 		offsets = append(offsets, off)
 		w.Header().Set("Content-Type", "application/json")
-		game := `{"gameId":%d,"status":"final","gameType":"regular_season","timeStampZulu":"2026-09-13T16:00:00Z","home":{"id":1,"title":"A","goals":1},"visitor":{"id":2,"title":"B","goals":0}}`
+		game := `{"gameId":%d,"status":"final","gameType":"regular_season","date":"Sep 13, 2026","time":"9:00 AM","home":{"id":1,"title":"A","goals":1},"visitor":{"id":2,"title":"B","goals":0}}`
 		switch off {
 		case "0":
 			w.Write([]byte(`{"data":[` + strings.ReplaceAll(game, "%d", "1") + `,` + strings.ReplaceAll(game, "%d", "2") + `],"meta":{"total":3}}`))
@@ -193,8 +222,8 @@ func TestGamesPages(t *testing.T) {
 func TestGamesRefusesChangedShape(t *testing.T) {
 	for name, body := range map[string]string{
 		"no meta":   `{"data":[]}`,
-		"no goals":  `{"data":[{"gameId":1,"status":"final","timeStampZulu":"2026-09-13T16:00:00Z","home":{"id":1},"visitor":{"id":2}}],"meta":{"total":1}}`,
-		"bad start": `{"data":[{"gameId":1,"status":"final","timeStampZulu":"Sep 13","home":{"id":1,"goals":0},"visitor":{"id":2,"goals":0}}],"meta":{"total":1}}`,
+		"no goals":  `{"data":[{"gameId":1,"status":"final","date":"Sep 13, 2026","time":"9:00 AM","home":{"id":1},"visitor":{"id":2}}],"meta":{"total":1}}`,
+		"bad start": `{"data":[{"gameId":1,"status":"final","date":"Sep 13","time":"9:00 AM","home":{"id":1,"goals":0},"visitor":{"id":2,"goals":0}}],"meta":{"total":1}}`,
 	} {
 		c, _ := fakeGameSheet(t, map[string]string{"/api/unified-games/15331": body})
 		if _, err := c.Games(context.Background(), 15331); err == nil {

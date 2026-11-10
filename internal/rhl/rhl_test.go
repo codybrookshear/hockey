@@ -87,7 +87,7 @@ func savedGameSheetWith(t *testing.T, more map[string]string) *countingSource {
 		w.Write(b)
 	}))
 	t.Cleanup(srv.Close)
-	return &countingSource{Source: &gamesheet.Client{HTTP: srv.Client(), BaseURL: srv.URL}, calls: map[string]int{}}
+	return &countingSource{Source: &gamesheet.Client{HTTP: srv.Client(), BaseURL: srv.URL, Location: la}, calls: map[string]int{}}
 }
 
 // countingSource counts calls, and can be made to fail.
