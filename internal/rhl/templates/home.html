@@ -4,7 +4,7 @@
 {{- with .Divisions}}
 <nav class="divisions{{if gt (len .) 2}} many{{end}}" aria-label="Division">
   {{- range .}}
-  <a href="/?division={{.ID}}"{{if .Selected}} aria-current="page"{{end}}>{{.Label}}</a>
+  <a href="{{.Href}}"{{if .Selected}} aria-current="page"{{end}}>{{.Label}}</a>
   {{- end}}
 </nav>
 {{- end}}
@@ -34,8 +34,8 @@
     <tbody>
       {{- range .}}
       <tr>
-        <td class="rank">{{.Rank}}</td>
-        <td class="team">{{template "logo" .}}<a href="/team/{{.ID}}">{{.Name}}</a></td>
+        <td class="rank">{{if .Rank}}{{.Rank}}{{else}}–{{end}}</td>
+        <td class="team">{{template "logo" .}}<a href="{{.Href}}">{{.Name}}</a></td>
         <td>{{.GP}}</td><td>{{.W}}</td><td>{{.L}}</td><td>{{.T}}</td>
         <td class="pts">{{.PTS}}</td>
         <td class="wide">{{.GF}}</td><td class="wide">{{.GA}}</td>

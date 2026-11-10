@@ -9,6 +9,7 @@
 package gamesheet
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -53,7 +54,7 @@ type Division struct {
 
 // Standing is a team's line in its division, as GameSheet ranks it.
 type Standing struct {
-	Rank                   int
+	Rank                   int // 0: not ranked yet (no games)
 	Team                   Team
 	GP, W, L, T, OTL       int
 	PTS, GF, GA, Diff      int
@@ -177,7 +178,8 @@ func (c *Client) Standings(ctx context.Context, season int) ([]Division, error) 
 					ID    int    `json:"id"`
 					Title string `json:"title"`
 				} `json:"division"`
-				Rank   int    `json:"rank"`
+				Rank *int `json:"rank"` // null before a team's first game, sometimes
+
 				Reason string `json:"reason"`
 				// Keys are GameSheet's abbreviations: GP, W, L, T, OTL, PTS…
 				Stats struct {
@@ -211,12 +213,19 @@ func (c *Client) Standings(ctx context.Context, season int) ([]Division, error) 
 					return nil, fmt.Errorf("standings: %q is missing a stat (the response changed shape)", s.Team.Title)
 				}
 			}
-			if s.Team.ID == 0 || s.Team.Title == "" || s.Rank < 1 || s.Division.ID != d.DivisionID {
+			// A new season's teams have no rank until they play (unless
+			// ranked by hand); anyone who has played does.
+			rank := 0
+			if s.Rank != nil {
+				rank = *s.Rank
+			}
+			if s.Team.ID == 0 || s.Team.Title == "" || s.Division.ID != d.DivisionID ||
+				(s.Rank != nil && rank < 1) || (s.Rank == nil && *st.GP != 0) {
 				return nil, errors.New("standings: unexpected team entry (the response changed shape)")
 			}
 			div.Title = s.Division.Title
 			div.Teams = append(div.Teams, Standing{
-				Rank: s.Rank,
+				Rank: rank,
 				Team: Team{ID: s.Team.ID, Title: s.Team.Title, Abbr: s.Team.Abbr, Logo: s.Team.Logo},
 				GP:   *st.GP, W: *st.W, L: *st.L, T: *st.T, OTL: *st.OTL,
 				PTS: *st.PTS, GF: *st.GF, GA: *st.GA, Diff: *st.DIFF, PIM: st.PIM,
@@ -226,8 +235,17 @@ func (c *Client) Standings(ctx context.Context, season int) ([]Division, error) 
 		if len(div.Teams) == 0 {
 			continue
 		}
-		// The response isn't always in rank order.
-		slices.SortStableFunc(div.Teams, func(a, b Standing) int { return a.Rank - b.Rank })
+		// The response isn't always in rank order. Unranked teams (no games
+		// yet) go last, by name.
+		slices.SortStableFunc(div.Teams, func(a, b Standing) int {
+			if (a.Rank == 0) != (b.Rank == 0) {
+				return cmp.Compare(b.Rank, a.Rank) // the unranked 0 last
+			}
+			if a.Rank == 0 {
+				return cmp.Compare(a.Team.Title, b.Team.Title)
+			}
+			return cmp.Compare(a.Rank, b.Rank)
+		})
 		divs = append(divs, div)
 	}
 	return divs, nil

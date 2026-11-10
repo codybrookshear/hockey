@@ -2,9 +2,11 @@ package gamesheet
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -29,6 +31,10 @@ func fakeGameSheet(t *testing.T, override map[string]string) (*Client, *[]string
 			"/api/unified-games/15331":     "unified-games-15331.json",
 			"/api/goalies/standings/15331": "goalies-15331.json",
 			"/api/leagues/620287/seasons":  "league-seasons-620287.json",
+			"/api/standings/16530":         "standings-16530.json",
+			// Trimmed to a few players (2026-11-10).
+			"/api/teams/16530/587702/roster": "roster-16530-587702.json",
+			"/api/teams/15331/554799/roster": "roster-15331-554799.json",
 		}[r.URL.Path]
 		if r.URL.Path == "/api/players/standings/15331" && r.URL.Query().Get("limit") == "100" {
 			name = "players-15331-" + r.URL.Query().Get("offset") + ".json"
@@ -323,6 +329,79 @@ func TestPlayersRefuseChangedShape(t *testing.T) {
 			_, err = cl.Skaters(context.Background(), 15331)
 		}
 		if err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}
+
+// A new season (16530, saved 2026-11-10, two teams a division): nobody has
+// played, and most teams have no rank.
+func TestStandingsBeforeAnyGames(t *testing.T) {
+	c, _ := fakeGameSheet(t, nil)
+	divs, err := c.Standings(context.Background(), 16530)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, d := range divs {
+		for _, s := range d.Teams {
+			if s.GP != 0 || s.W != 0 || s.PTS != 0 {
+				t.Errorf("%s: %+v", s.Team.Title, s)
+			}
+			got = append(got, fmt.Sprintf("%s %d %s", d.Title, s.Rank, s.Team.Title))
+		}
+	}
+	// Unranked: by name. Ranked by hand (Apollo): as ranked.
+	want := []string{"Bravo 0 Renegades", "Bravo 0 Warlocks", "Apollo 1 White Lightning", "Apollo 2 Rogue"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+func TestStandingsRefuseUnrankedAfterGames(t *testing.T) {
+	body := `{"status":"success","data":[{"divisionId":1,"standings":[{"division":{"id":1,"title":"A"},"rank":null,` +
+		`"stats":{"GP":1,"W":1,"L":0,"T":0,"OTL":0,"PTS":2,"GF":1,"GA":0,"DIFF":1},"team":{"id":5,"title":"X"}}]}]}`
+	c, _ := fakeGameSheet(t, map[string]string{"/api/standings/16530": body})
+	if _, err := c.Standings(context.Background(), 16530); err == nil {
+		t.Error("accepted a team with games and no rank")
+	}
+}
+
+func TestRoster(t *testing.T) {
+	c, paths := fakeGameSheet(t, nil)
+	r, err := c.Roster(context.Background(), 16530, 587702)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if (*paths)[0] != "/api/teams/16530/587702/roster" {
+		t.Errorf("fetched %q", (*paths)[0])
+	}
+	if len(r.Skaters) != 4 || len(r.Goalies) != 0 {
+		t.Fatalf("%d skaters, %d goalies", len(r.Skaters), len(r.Goalies))
+	}
+	if a := r.Skaters[0]; a.Last != "ARNOLD IV" || a.ID != 9098170 || a.GP != 0 || len(a.Teams) != 1 || a.Teams[0].ID != 587702 {
+		t.Errorf("first: %+v", a)
+	}
+
+	r, err = c.Roster(context.Background(), 15331, 554799)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Skaters) != 3 || len(r.Goalies) != 1 {
+		t.Fatalf("%d skaters, %d goalies", len(r.Skaters), len(r.Goalies))
+	}
+	if g := r.Goalies[0]; g.Last != "WANKE" || g.Jersey != "0" || g.Teams[0].W != 3 || g.Teams[0].SO != 2 || g.Teams[0].SVPct < 0.85 {
+		t.Errorf("goalie: %+v", g)
+	}
+
+	for name, body := range map[string]string{
+		"error status":      `{"players":{"status":"error"},"goalies":{"status":"success","data":[]}}`,
+		"no goalies":        `{"players":{"status":"success","data":[]}}`,
+		"player without gp": `{"players":{"status":"success","data":[{"id":1,"stats":{"g":0,"a":0,"pts":0,"pim":0}}]},"goalies":{"status":"success","data":[]}}`,
+		"goalie without id": `{"players":{"status":"success","data":[]},"goalies":{"status":"success","data":[{"stats":{"gp":0,"wins":0,"losses":0,"ties":0,"ga":0}}]}}`,
+	} {
+		c, _ := fakeGameSheet(t, map[string]string{"/api/teams/16530/587702/roster": body})
+		if _, err := c.Roster(context.Background(), 16530, 587702); err == nil {
 			t.Errorf("%s: accepted", name)
 		}
 	}

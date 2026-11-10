@@ -3,7 +3,7 @@
 {{/* A team's logo; teams without one get their initial on a badge. Takes .ID, .Name, .HasLogo, .TBD. */}}
 {{define "logo"}}{{if .HasLogo}}<img class="logo" src="/logo/{{.ID}}" alt="" width="22" height="22" loading="lazy">{{else if .TBD}}<span class="logo"></span>{{else}}<span class="logo initial" aria-hidden="true">{{initial .Name}}</span>{{end}}{{end}}
 
-{{define "teamname"}}{{if .TBD}}<span class="tbd">TBD</span>{{else}}<a href="/team/{{.ID}}">{{.Name}}</a>{{end}}{{end}}
+{{define "teamname"}}{{if .TBD}}<span class="tbd">TBD</span>{{else}}<a href="{{.Href}}">{{.Name}}</a>{{end}}{{end}}
 
 {{/* A final with goals opens to show the scorers; anything else is a plain card. */}}
 {{define "game"}}
@@ -62,7 +62,7 @@
     {{- range .}}
     <tr>
       <td class="num">{{if .Team}}{{.Rank}}{{else}}{{.Jersey}}{{end}}</td>
-      <td class="who">{{.Name}}{{if .Team}} <a class="abbr" href="/team/{{.TeamID}}">{{.Team}}</a>{{end}}</td>
+      <td class="who">{{.Name}}{{if .Team}} <a class="abbr" href="{{.TeamHref}}">{{.Team}}</a>{{end}}</td>
       <td>{{.GP}}</td><td>{{.G}}</td><td>{{.A}}</td><td class="pts">{{.PTS}}</td>
       <td class="wide">{{.PIM}}</td>
     </tr>
@@ -83,8 +83,9 @@
   <tbody>
     {{- range .}}
     <tr>
-      <td class="who">{{.Name}}{{if .Team}} <a class="abbr" href="/team/{{.TeamID}}">{{.Team}}</a>{{end}}</td>
-      <td>{{.GP}}</td><td>{{.W}}-{{.L}}-{{.T}}</td><td>{{gaa .GAA}}</td><td class="pts">{{svpct .SVPct}}</td>
+      <td class="who">{{.Name}}{{if .Team}} <a class="abbr" href="{{.TeamHref}}">{{.Team}}</a>{{end}}</td>
+      <td>{{.GP}}</td><td>{{.W}}-{{.L}}-{{.T}}</td>
+      {{- if .GP}}<td>{{gaa .GAA}}</td><td class="pts">{{svpct .SVPct}}</td>{{else}}<td>–</td><td class="pts">–</td>{{end}}
       <td class="wide">{{.SO}}</td>
     </tr>
     {{- end}}

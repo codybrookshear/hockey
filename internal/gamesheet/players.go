@@ -54,53 +54,16 @@ const (
 
 // Skaters returns every skater in a season, as GameSheet sorts them (points).
 func (c *Client) Skaters(ctx context.Context, season int) ([]Skater, error) {
-	type line struct {
-		GP, G, A, PTS, PIM *int
-		PPG, SHG, GWG      int
-	}
-	type raw struct {
-		ID        int    `json:"id"`
-		FirstName string `json:"firstName"`
-		LastName  string `json:"lastName"`
-		Jersey    string `json:"jersey"`
-		Stats     line   `json:"stats"`
-		Teams     []struct {
-			ID    int    `json:"id"`
-			Title string `json:"title"`
-			Abbr  string `json:"abbreviation"`
-			Logo  string `json:"logo"`
-			Stats line   `json:"stats"`
-		} `json:"teams"`
-	}
-	conv := func(who string, l line) (SkaterLine, error) {
-		for _, p := range []*int{l.GP, l.G, l.A, l.PTS, l.PIM} {
-			if p == nil {
-				return SkaterLine{}, fmt.Errorf("skaters: %s is missing a stat (the response changed shape)", who)
-			}
-		}
-		return SkaterLine{GP: *l.GP, G: *l.G, A: *l.A, PTS: *l.PTS, PIM: *l.PIM, PPG: l.PPG, SHG: l.SHG, GWG: l.GWG}, nil
-	}
 	var out []Skater
 	err := c.pages(ctx, "players/standings/"+strconv.Itoa(season), func(page []byte) (int, error) {
-		var rows []raw
+		var rows []rawSkater
 		if err := decodeData(page, &rows); err != nil {
 			return 0, err
 		}
 		for _, r := range rows {
-			if r.ID == 0 {
-				return 0, errors.New("skaters: a player without an ID (the response changed shape)")
-			}
-			s := Skater{Player: Player{ID: r.ID, First: r.FirstName, Last: r.LastName}, Jersey: r.Jersey}
-			var err error
-			if s.SkaterLine, err = conv(r.LastName, r.Stats); err != nil {
+			s, err := r.skater()
+			if err != nil {
 				return 0, err
-			}
-			for _, t := range r.Teams {
-				st := SkaterTeam{Team: Team{ID: t.ID, Title: t.Title, Abbr: t.Abbr, Logo: t.Logo}}
-				if st.SkaterLine, err = conv(r.LastName, t.Stats); err != nil {
-					return 0, err
-				}
-				s.Teams = append(s.Teams, st)
 			}
 			out = append(out, s)
 		}
@@ -111,71 +74,177 @@ func (c *Client) Skaters(ctx context.Context, season int) ([]Skater, error) {
 
 // Goalies returns every goalie in a season, games played or not.
 func (c *Client) Goalies(ctx context.Context, season int) ([]Goalie, error) {
-	type line struct {
-		GP    *int     `json:"gp"`
-		W     *int     `json:"wins"`
-		L     *int     `json:"losses"`
-		T     *int     `json:"ties"`
-		OTL   int      `json:"otl"`
-		SO    int      `json:"so"`
-		GA    *int     `json:"ga"`
-		SA    int      `json:"sa"`
-		GAA   *float64 `json:"gaa"` // null with no games
-		SVPct float64  `json:"svpct"`
-	}
-	type raw struct {
-		ID        int    `json:"id"`
-		FirstName string `json:"firstName"`
-		LastName  string `json:"lastName"`
-		Jersey    string `json:"jersey"`
-		Stats     line   `json:"stats"`
-		Teams     []struct {
-			ID    int    `json:"id"`
-			Title string `json:"title"`
-			Abbr  string `json:"abbreviation"`
-			Logo  string `json:"logo"`
-			Stats line   `json:"stats"`
-		} `json:"teams"`
-	}
-	conv := func(who string, l line) (GoalieLine, error) {
-		for _, p := range []*int{l.GP, l.W, l.L, l.T, l.GA} {
-			if p == nil {
-				return GoalieLine{}, fmt.Errorf("goalies: %s is missing a stat (the response changed shape)", who)
-			}
-		}
-		g := GoalieLine{GP: *l.GP, W: *l.W, L: *l.L, T: *l.T, OTL: l.OTL, SO: l.SO, GA: *l.GA, SA: l.SA, SVPct: l.SVPct}
-		if l.GAA != nil {
-			g.GAA = *l.GAA
-		}
-		return g, nil
-	}
 	var out []Goalie
 	err := c.pages(ctx, "goalies/standings/"+strconv.Itoa(season), func(page []byte) (int, error) {
-		var rows []raw
+		var rows []rawGoalie
 		if err := decodeData(page, &rows); err != nil {
 			return 0, err
 		}
 		for _, r := range rows {
-			if r.ID == 0 {
-				return 0, errors.New("goalies: a goalie without an ID (the response changed shape)")
-			}
-			g := Goalie{Player: Player{ID: r.ID, First: r.FirstName, Last: r.LastName}, Jersey: r.Jersey}
-			var err error
-			if g.GoalieLine, err = conv(r.LastName, r.Stats); err != nil {
+			g, err := r.goalie()
+			if err != nil {
 				return 0, err
-			}
-			for _, t := range r.Teams {
-				gt := GoalieTeam{Team: Team{ID: t.ID, Title: t.Title, Abbr: t.Abbr, Logo: t.Logo}}
-				if gt.GoalieLine, err = conv(r.LastName, t.Stats); err != nil {
-					return 0, err
-				}
-				g.Teams = append(g.Teams, gt)
 			}
 			out = append(out, g)
 		}
 		return len(rows), nil
 	})
 	return out, err
+}
+
+// Roster is a team's players and goalies, as signed up for the season:
+// before its first game too, when the season's stats list nobody for it.
+// Each one's Teams has their line for this team.
+type Roster struct {
+	Skaters []Skater
+	Goalies []Goalie
+}
+
+// Roster returns a team's roster in a season. Not in the stats site's
+// network traffic (its team pages are rendered server-side); found in its
+// JavaScript.
+func (c *Client) Roster(ctx context.Context, season, team int) (Roster, error) {
+	var body struct {
+		Players struct {
+			Status string      `json:"status"`
+			Data   []rawSkater `json:"data"`
+		} `json:"players"`
+		Goalies struct {
+			Status string      `json:"status"`
+			Data   []rawGoalie `json:"data"`
+		} `json:"goalies"`
+	}
+	path := "teams/" + strconv.Itoa(season) + "/" + strconv.Itoa(team) + "/roster"
+	if err := c.get(ctx, path, nil, &body); err != nil {
+		return Roster{}, err
+	}
+	if body.Players.Status != "success" || body.Goalies.Status != "success" {
+		return Roster{}, fmt.Errorf("roster: status %q/%q", body.Players.Status, body.Goalies.Status)
+	}
+	var out Roster
+	for _, r := range body.Players.Data {
+		s, err := r.skater()
+		if err != nil {
+			return Roster{}, err
+		}
+		out.Skaters = append(out.Skaters, s)
+	}
+	for _, r := range body.Goalies.Data {
+		g, err := r.goalie()
+		if err != nil {
+			return Roster{}, err
+		}
+		out.Goalies = append(out.Goalies, g)
+	}
+	return out, nil
+}
+
+type rawSkaterLine struct {
+	GP, G, A, PTS, PIM *int
+	PPG, SHG, GWG      int
+}
+
+type rawSkater struct {
+	ID        int           `json:"id"`
+	FirstName string        `json:"firstName"`
+	LastName  string        `json:"lastName"`
+	Jersey    string        `json:"jersey"`
+	Stats     rawSkaterLine `json:"stats"`
+	Teams     []struct {
+		ID    int           `json:"id"`
+		Title string        `json:"title"`
+		Abbr  string        `json:"abbreviation"`
+		Logo  string        `json:"logo"`
+		Stats rawSkaterLine `json:"stats"`
+	} `json:"teams"`
+}
+
+func (l rawSkaterLine) line(who string) (SkaterLine, error) {
+	for _, p := range []*int{l.GP, l.G, l.A, l.PTS, l.PIM} {
+		if p == nil {
+			return SkaterLine{}, fmt.Errorf("skaters: %s is missing a stat (the response changed shape)", who)
+		}
+	}
+	return SkaterLine{GP: *l.GP, G: *l.G, A: *l.A, PTS: *l.PTS, PIM: *l.PIM, PPG: l.PPG, SHG: l.SHG, GWG: l.GWG}, nil
+}
+
+func (r rawSkater) skater() (Skater, error) {
+	if r.ID == 0 {
+		return Skater{}, errors.New("skaters: a player without an ID (the response changed shape)")
+	}
+	s := Skater{Player: Player{ID: r.ID, First: r.FirstName, Last: r.LastName}, Jersey: r.Jersey}
+	var err error
+	if s.SkaterLine, err = r.Stats.line(r.LastName); err != nil {
+		return Skater{}, err
+	}
+	for _, t := range r.Teams {
+		st := SkaterTeam{Team: Team{ID: t.ID, Title: t.Title, Abbr: t.Abbr, Logo: t.Logo}}
+		if st.SkaterLine, err = t.Stats.line(r.LastName); err != nil {
+			return Skater{}, err
+		}
+		s.Teams = append(s.Teams, st)
+	}
+	return s, nil
+}
+
+type rawGoalieLine struct {
+	GP    *int     `json:"gp"`
+	W     *int     `json:"wins"`
+	L     *int     `json:"losses"`
+	T     *int     `json:"ties"`
+	OTL   int      `json:"otl"`
+	SO    int      `json:"so"`
+	GA    *int     `json:"ga"`
+	SA    int      `json:"sa"`
+	GAA   *float64 `json:"gaa"` // null with no games
+	SVPct float64  `json:"svpct"`
+}
+
+type rawGoalie struct {
+	ID        int           `json:"id"`
+	FirstName string        `json:"firstName"`
+	LastName  string        `json:"lastName"`
+	Jersey    string        `json:"jersey"`
+	Stats     rawGoalieLine `json:"stats"`
+	Teams     []struct {
+		ID    int           `json:"id"`
+		Title string        `json:"title"`
+		Abbr  string        `json:"abbreviation"`
+		Logo  string        `json:"logo"`
+		Stats rawGoalieLine `json:"stats"`
+	} `json:"teams"`
+}
+
+func (l rawGoalieLine) line(who string) (GoalieLine, error) {
+	for _, p := range []*int{l.GP, l.W, l.L, l.T, l.GA} {
+		if p == nil {
+			return GoalieLine{}, fmt.Errorf("goalies: %s is missing a stat (the response changed shape)", who)
+		}
+	}
+	g := GoalieLine{GP: *l.GP, W: *l.W, L: *l.L, T: *l.T, OTL: l.OTL, SO: l.SO, GA: *l.GA, SA: l.SA, SVPct: l.SVPct}
+	if l.GAA != nil {
+		g.GAA = *l.GAA
+	}
+	return g, nil
+}
+
+func (r rawGoalie) goalie() (Goalie, error) {
+	if r.ID == 0 {
+		return Goalie{}, errors.New("goalies: a goalie without an ID (the response changed shape)")
+	}
+	g := Goalie{Player: Player{ID: r.ID, First: r.FirstName, Last: r.LastName}, Jersey: r.Jersey}
+	var err error
+	if g.GoalieLine, err = r.Stats.line(r.LastName); err != nil {
+		return Goalie{}, err
+	}
+	for _, t := range r.Teams {
+		gt := GoalieTeam{Team: Team{ID: t.ID, Title: t.Title, Abbr: t.Abbr, Logo: t.Logo}}
+		if gt.GoalieLine, err = t.Stats.line(r.LastName); err != nil {
+			return Goalie{}, err
+		}
+		g.Teams = append(g.Teams, gt)
+	}
+	return g, nil
 }
 
 // LeagueSeasons returns a league's seasons.
