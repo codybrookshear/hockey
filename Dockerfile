@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # One image per app: --build-arg CMD=schedule or CMD=rhl.
 # Pinned to digests; Dependabot keeps them current.
-ARG GO_IMAGE=golang:1.27-trixie@sha256:3b77fc618ec235a1ab412de7737f120dd507c57e8d87de4cbb7994fb94275ed5
+ARG GO_IMAGE=golang:1.27-trixie@sha256:af1bfc2614ebb1dbd31af514b78740fd678850e76498762b425ecee4c5c6ea80
 ARG RUNTIME_IMAGE=gcr.io/distroless/static-debian13:nonroot@sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3
 
 # The build runs on the builder's own platform and Go cross-compiles for the
