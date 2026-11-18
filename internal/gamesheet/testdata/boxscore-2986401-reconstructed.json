@@ -1,0 +1,1071 @@
+{
+ "liveId": "",
+ "gameId": "2986401",
+ "gameNumber": "Game 1",
+ "gameType": "Regular Season",
+ "date": "Sep 13, 2026, 9:00 AM",
+ "location": "The Rink Exchange",
+ "gameStatus": "Final",
+ "attendance": null,
+ "periods": {
+  "1": 15,
+  "2": 15,
+  "3": 15
+ },
+ "home": {
+  "id": 554812,
+  "title": "Orange",
+  "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/8182fac1-0ec6-4126-928a-143c839a1900/256",
+  "division": "A/B Division",
+  "record": "1-3-0",
+  "finalScore": "7",
+  "sog": 41,
+  "roster": {
+   "players": [
+    {
+     "id": "8471626",
+     "firstName": "JUSTIN",
+     "lastName": "BRISTOL",
+     "number": "36",
+     "position": "",
+     "status": "playing",
+     "duty": "",
+     "affiliated": false,
+     "added_at_game_time": false,
+     "starting": false,
+     "g": 2,
+     "a": 0,
+     "pts": 2,
+     "pim": 2,
+     "yc": 0,
+     "rc": 0,
+     "ga": null,
+     "sa": null,
+     "svpct": null,
+     "toi": null,
+     "season": {
+      "goals": 0,
+      "assists": 0
+     }
+    },
+    {
+     "id": "8471625",
+     "firstName": "TRAVIS",
+     "lastName": "JOHANNES",
+     "number": "35",
+     "position": "",
+     "status": "playing",
+     "duty": "",
+     "affiliated": false,
+     "added_at_game_time": false,
+     "starting": false,
+     "g": 2,
+     "a": 0,
+     "pts": 2,
+     "pim": 0,
+     "yc": 0,
+     "rc": 0,
+     "ga": null,
+     "sa": null,
+     "svpct": null,
+     "toi": null,
+     "season": {
+      "goals": 0,
+      "assists": 0
+     }
+    },
+    {
+     "id": "8471624",
+     "firstName": "GREG",
+     "lastName": "MEYER",
+     "number": "34",
+     "position": "",
+     "status": "playing",
+     "duty": "",
+     "affiliated": false,
+     "added_at_game_time": false,
+     "starting": false,
+     "g": 1,
+     "a": 0,
+     "pts": 1,
+     "pim": 2,
+     "yc": 0,
+     "rc": 0,
+     "ga": null,
+     "sa": null,
+     "svpct": null,
+     "toi": null,
+     "season": {
+      "goals": 0,
+      "assists": 0
+     }
+    },
+    {
+     "id": "8471620",
+     "firstName": "ALEXANDER",
+     "lastName": "ROSEN",
+     "number": "30",
+     "position": "",
+     "status": "playing",
+     "duty": "",
+     "affiliated": false,
+     "added_at_game_time": false,
+     "starting": false,
+     "g": 1,
+     "a": 0,
+     "pts": 1,
+     "pim": 0,
+     "yc": 0,
+     "rc": 0,
+     "ga": null,
+     "sa": null,
+     "svpct": null,
+     "toi": null,
+     "season": {
+      "goals": 0,
+      "assists": 0
+     }
+    },
+    {
+     "id": "8471623",
+     "firstName": "TANNER",
+     "lastName": "KNOBLOCK",
+     "number": "33",
+     "position": "",
+     "status": "playing",
+     "duty": "",
+     "affiliated": false,
+     "added_at_game_time": false,
+     "starting": false,
+     "g": 1,
+     "a": 0,
+     "pts": 1,
+     "pim": 0,
+     "yc": 0,
+     "rc": 0,
+     "ga": null,
+     "sa": null,
+     "svpct": null,
+     "toi": null,
+     "season": {
+      "goals": 0,
+      "assists": 0
+     }
+    },
+    {
+     "id": "8479001",
+     "firstName": "PAT",
+     "lastName": "ORANGEGOALIE",
+     "number": "1",
+     "position": "goalie",
+     "status": "playing",
+     "duty": "",
+     "affiliated": false,
+     "added_at_game_time": false,
+     "starting": true,
+     "g": 0,
+     "a": 0,
+     "pts": 0,
+     "pim": 0,
+     "yc": 0,
+     "rc": 0,
+     "ga": 9,
+     "sa": 38,
+     "svpct": 0.763,
+     "toi": "45:00",
+     "season": {
+      "goals": 0,
+      "assists": 0
+     }
+    },
+    {
+     "id": "8479002",
+     "firstName": "SAM",
+     "lastName": "SCRATCH",
+     "number": "99",
+     "position": "",
+     "status": "scratched",
+     "duty": "",
+     "affiliated": false,
+     "added_at_game_time": false,
+     "starting": false,
+     "g": 0,
+     "a": 0,
+     "pts": 0,
+     "pim": 0,
+     "yc": 0,
+     "rc": 0,
+     "ga": null,
+     "sa": null,
+     "svpct": null,
+     "toi": null,
+     "season": {
+      "goals": 0,
+      "assists": 0
+     }
+    }
+   ],
+   "coaches": []
+  }
+ },
+ "visitor": {
+  "id": 554805,
+  "title": "Pirates",
+  "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/1f455666-dd08-4d55-8a18-1a0b745b1f00/256",
+  "division": "A/B Division",
+  "record": "2-1-0",
+  "finalScore": "9",
+  "sog": 38,
+  "roster": {
+   "players": [
+    {
+     "id": "8471640",
+     "firstName": "DEREK",
+     "lastName": "DUSOME",
+     "number": "50",
+     "position": "",
+     "status": "playing",
+     "duty": "",
+     "affiliated": false,
+     "added_at_game_time": false,
+     "starting": false,
+     "g": 5,
+     "a": 0,
+     "pts": 5,
+     "pim": 0,
+     "yc": 0,
+     "rc": 0,
+     "ga": null,
+     "sa": null,
+     "svpct": null,
+     "toi": null,
+     "season": {
+      "goals": 0,
+      "assists": 0
+     }
+    },
+    {
+     "id": "8471639",
+     "firstName": "ROBERT",
+     "lastName": "FUNK",
+     "number": "49",
+     "position": "",
+     "status": "playing",
+     "duty": "",
+     "affiliated": false,
+     "added_at_game_time": false,
+     "starting": false,
+     "g": 1,
+     "a": 1,
+     "pts": 2,
+     "pim": 0,
+     "yc": 0,
+     "rc": 0,
+     "ga": null,
+     "sa": null,
+     "svpct": null,
+     "toi": null,
+     "season": {
+      "goals": 0,
+      "assists": 0
+     }
+    },
+    {
+     "id": "8471636",
+     "firstName": "LEO",
+     "lastName": "KATZ",
+     "number": "46",
+     "position": "",
+     "status": "playing",
+     "duty": "",
+     "affiliated": false,
+     "added_at_game_time": false,
+     "starting": false,
+     "g": 3,
+     "a": 2,
+     "pts": 5,
+     "pim": 0,
+     "yc": 0,
+     "rc": 0,
+     "ga": null,
+     "sa": null,
+     "svpct": null,
+     "toi": null,
+     "season": {
+      "goals": 0,
+      "assists": 0
+     }
+    },
+    {
+     "id": "8479011",
+     "firstName": "CHRIS",
+     "lastName": "PIRATEGOALIE",
+     "number": "1",
+     "position": "goalie",
+     "status": "playing",
+     "duty": "",
+     "affiliated": false,
+     "added_at_game_time": false,
+     "starting": true,
+     "g": 0,
+     "a": 0,
+     "pts": 0,
+     "pim": 0,
+     "yc": 0,
+     "rc": 0,
+     "ga": 7,
+     "sa": 41,
+     "svpct": 0.829,
+     "toi": "45:00",
+     "season": {
+      "goals": 0,
+      "assists": 0
+     }
+    },
+    {
+     "id": "8479012",
+     "firstName": "SAM",
+     "lastName": "SCRATCH",
+     "number": "99",
+     "position": "",
+     "status": "scratched",
+     "duty": "",
+     "affiliated": false,
+     "added_at_game_time": false,
+     "starting": false,
+     "g": 0,
+     "a": 0,
+     "pts": 0,
+     "pim": 0,
+     "yc": 0,
+     "rc": 0,
+     "ga": null,
+     "sa": null,
+     "svpct": null,
+     "toi": null,
+     "season": {
+      "goals": 0,
+      "assists": 0
+     }
+    }
+   ],
+   "coaches": []
+  }
+ },
+ "tables": {
+  "goalsByPeriod": [
+   {
+    "period": "1ST Period",
+    "type": "goals",
+    "periodEvents": [
+     {
+      "eventType": "goal",
+      "time": "09:59",
+      "period": "1",
+      "homeTeam": true,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471626",
+       "title": "JUSTIN BRISTOL",
+       "number": "36",
+       "trackingNumber": "1",
+       "totalGoalCount": "1"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554812,
+       "title": "Orange",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/8182fac1-0ec6-4126-928a-143c839a1900/256"
+      }
+     },
+     {
+      "eventType": "goal",
+      "time": "03:03",
+      "period": "1",
+      "homeTeam": false,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471640",
+       "title": "DEREK DUSOME",
+       "number": "50",
+       "trackingNumber": "1",
+       "totalGoalCount": "1"
+      },
+      "assist1By": {
+       "id": "8471639",
+       "title": "ROBERT FUNK",
+       "number": "49",
+       "trackingNumber": "1",
+       "totalGoalCount": "1"
+      },
+      "assist2By": {
+       "id": "8471636",
+       "title": "LEO KATZ",
+       "number": "46",
+       "trackingNumber": "1",
+       "totalGoalCount": "1"
+      },
+      "team": {
+       "id": 554805,
+       "title": "Pirates",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/1f455666-dd08-4d55-8a18-1a0b745b1f00/256"
+      }
+     },
+     {
+      "eventType": "goal",
+      "time": "02:32",
+      "period": "1",
+      "homeTeam": false,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471640",
+       "title": "DEREK DUSOME",
+       "number": "50",
+       "trackingNumber": "2",
+       "totalGoalCount": "2"
+      },
+      "assist1By": {
+       "id": "8471636",
+       "title": "LEO KATZ",
+       "number": "46",
+       "trackingNumber": "1",
+       "totalGoalCount": "2"
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554805,
+       "title": "Pirates",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/1f455666-dd08-4d55-8a18-1a0b745b1f00/256"
+      }
+     }
+    ]
+   },
+   {
+    "period": "2ND Period",
+    "type": "goals",
+    "periodEvents": [
+     {
+      "eventType": "goal",
+      "time": "14:21",
+      "period": "2",
+      "homeTeam": false,
+      "powerPlay": true,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471640",
+       "title": "DEREK DUSOME",
+       "number": "50",
+       "trackingNumber": "3",
+       "totalGoalCount": "3"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554805,
+       "title": "Pirates",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/1f455666-dd08-4d55-8a18-1a0b745b1f00/256"
+      }
+     },
+     {
+      "eventType": "goal",
+      "time": "12:11",
+      "period": "2",
+      "homeTeam": true,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": true,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471626",
+       "title": "JUSTIN BRISTOL",
+       "number": "36",
+       "trackingNumber": "2",
+       "totalGoalCount": "2"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554812,
+       "title": "Orange",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/8182fac1-0ec6-4126-928a-143c839a1900/256"
+      }
+     },
+     {
+      "eventType": "goal",
+      "time": "04:06",
+      "period": "2",
+      "homeTeam": false,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471639",
+       "title": "ROBERT FUNK",
+       "number": "49",
+       "trackingNumber": "1",
+       "totalGoalCount": "1"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554805,
+       "title": "Pirates",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/1f455666-dd08-4d55-8a18-1a0b745b1f00/256"
+      }
+     },
+     {
+      "eventType": "goal",
+      "time": "01:55",
+      "period": "2",
+      "homeTeam": true,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471625",
+       "title": "TRAVIS JOHANNES",
+       "number": "35",
+       "trackingNumber": "1",
+       "totalGoalCount": "1"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554812,
+       "title": "Orange",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/8182fac1-0ec6-4126-928a-143c839a1900/256"
+      }
+     },
+     {
+      "eventType": "goal",
+      "time": "00:13",
+      "period": "2",
+      "homeTeam": false,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471640",
+       "title": "DEREK DUSOME",
+       "number": "50",
+       "trackingNumber": "4",
+       "totalGoalCount": "4"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554805,
+       "title": "Pirates",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/1f455666-dd08-4d55-8a18-1a0b745b1f00/256"
+      }
+     }
+    ]
+   },
+   {
+    "period": "3RD Period",
+    "type": "goals",
+    "periodEvents": [
+     {
+      "eventType": "goal",
+      "time": "14:19",
+      "period": "3",
+      "homeTeam": false,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471636",
+       "title": "LEO KATZ",
+       "number": "46",
+       "trackingNumber": "1",
+       "totalGoalCount": "1"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554805,
+       "title": "Pirates",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/1f455666-dd08-4d55-8a18-1a0b745b1f00/256"
+      }
+     },
+     {
+      "eventType": "goal",
+      "time": "12:15",
+      "period": "3",
+      "homeTeam": true,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471624",
+       "title": "GREG MEYER",
+       "number": "34",
+       "trackingNumber": "1",
+       "totalGoalCount": "1"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554812,
+       "title": "Orange",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/8182fac1-0ec6-4126-928a-143c839a1900/256"
+      }
+     },
+     {
+      "eventType": "goal",
+      "time": "11:51",
+      "period": "3",
+      "homeTeam": true,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471620",
+       "title": "ALEXANDER ROSEN",
+       "number": "30",
+       "trackingNumber": "1",
+       "totalGoalCount": "1"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554812,
+       "title": "Orange",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/8182fac1-0ec6-4126-928a-143c839a1900/256"
+      }
+     },
+     {
+      "eventType": "goal",
+      "time": "11:31",
+      "period": "3",
+      "homeTeam": true,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471623",
+       "title": "TANNER KNOBLOCK",
+       "number": "33",
+       "trackingNumber": "1",
+       "totalGoalCount": "1"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554812,
+       "title": "Orange",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/8182fac1-0ec6-4126-928a-143c839a1900/256"
+      }
+     },
+     {
+      "eventType": "goal",
+      "time": "11:19",
+      "period": "3",
+      "homeTeam": false,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471636",
+       "title": "LEO KATZ",
+       "number": "46",
+       "trackingNumber": "2",
+       "totalGoalCount": "2"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554805,
+       "title": "Pirates",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/1f455666-dd08-4d55-8a18-1a0b745b1f00/256"
+      }
+     },
+     {
+      "eventType": "goal",
+      "time": "10:25",
+      "period": "3",
+      "homeTeam": true,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": true,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471625",
+       "title": "TRAVIS JOHANNES",
+       "number": "35",
+       "trackingNumber": "2",
+       "totalGoalCount": "2"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554812,
+       "title": "Orange",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/8182fac1-0ec6-4126-928a-143c839a1900/256"
+      }
+     },
+     {
+      "eventType": "goal",
+      "time": "07:39",
+      "period": "3",
+      "homeTeam": false,
+      "powerPlay": false,
+      "gameWinningGoal": true,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471640",
+       "title": "DEREK DUSOME",
+       "number": "50",
+       "trackingNumber": "5",
+       "totalGoalCount": "5"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554805,
+       "title": "Pirates",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/1f455666-dd08-4d55-8a18-1a0b745b1f00/256"
+      }
+     },
+     {
+      "eventType": "goal",
+      "time": "06:54",
+      "period": "3",
+      "homeTeam": false,
+      "powerPlay": false,
+      "gameWinningGoal": false,
+      "shg": false,
+      "en": false,
+      "plus": [],
+      "minus": [],
+      "goalScorer": {
+       "id": "8471636",
+       "title": "LEO KATZ",
+       "number": "46",
+       "trackingNumber": "3",
+       "totalGoalCount": "3"
+      },
+      "assist1By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "assist2By": {
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "team": {
+       "id": 554805,
+       "title": "Pirates",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/1f455666-dd08-4d55-8a18-1a0b745b1f00/256"
+      }
+     }
+    ]
+   }
+  ],
+  "penaltiesByPeriod": [
+   {
+    "period": "1ST Period",
+    "type": "penalty",
+    "periodEvents": [
+     {
+      "eventType": "penalty",
+      "time": "06:12",
+      "period": "1",
+      "homeTeam": true,
+      "major": false,
+      "commitedBy": {
+       "type": "players",
+       "id": "8471626",
+       "title": "JUSTIN BRISTOL",
+       "number": "36"
+      },
+      "servedBy": {
+       "id": "",
+       "title": " ",
+       "number": "36"
+      },
+      "penaltyType": {
+       "title": "Tripping - Minor",
+       "duration": "2",
+       "class": "minor"
+      },
+      "team": {
+       "id": 554812,
+       "title": "Orange",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/8182fac1-0ec6-4126-928a-143c839a1900/256"
+      }
+     }
+    ]
+   },
+   {
+    "period": "2ND Period",
+    "type": "penalty",
+    "periodEvents": [
+     {
+      "eventType": "penalty",
+      "time": "14:50",
+      "period": "2",
+      "homeTeam": true,
+      "major": false,
+      "commitedBy": {
+       "type": "players",
+       "id": "8471624",
+       "title": "GREG MEYER",
+       "number": "34"
+      },
+      "servedBy": {
+       "id": "",
+       "title": " ",
+       "number": "34"
+      },
+      "penaltyType": {
+       "title": "Hooking - Minor",
+       "duration": "2",
+       "class": "minor"
+      },
+      "team": {
+       "id": 554812,
+       "title": "Orange",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/8182fac1-0ec6-4126-928a-143c839a1900/256"
+      }
+     },
+     {
+      "eventType": "penalty",
+      "time": "03:30",
+      "period": "2",
+      "homeTeam": false,
+      "major": false,
+      "commitedBy": {
+       "type": "team",
+       "id": "",
+       "title": "",
+       "number": ""
+      },
+      "servedBy": {
+       "id": "8471636",
+       "title": "LEO KATZ",
+       "number": "46"
+      },
+      "penaltyType": {
+       "title": "Too Many Players - Bench Minor",
+       "duration": "2",
+       "class": "minor"
+      },
+      "team": {
+       "id": 554805,
+       "title": "Pirates",
+       "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/1f455666-dd08-4d55-8a18-1a0b745b1f00/256"
+      }
+     }
+    ]
+   },
+   {
+    "period": "3RD Period",
+    "type": "penalty",
+    "periodEvents": []
+   }
+  ],
+  "shots": {
+   "title": [
+    {
+     "id": 554805,
+     "title": "Pirates",
+     "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/1f455666-dd08-4d55-8a18-1a0b745b1f00/256"
+    },
+    {
+     "id": 554812,
+     "title": "Orange",
+     "logo": "https://imagedelivery.net/ErrQpIaCOWR-Tz51PhN1zA/8182fac1-0ec6-4126-928a-143c839a1900/256"
+    }
+   ],
+   "final": [
+    38,
+    41
+   ],
+   "shotsByPeriod": [
+    {
+     "period": "1",
+     "data": [
+      11,
+      12
+     ]
+    },
+    {
+     "period": "2",
+     "data": [
+      13,
+      14
+     ]
+    },
+    {
+     "period": "3",
+     "data": [
+      14,
+      15
+     ]
+    }
+   ]
+  }
+ }
+}

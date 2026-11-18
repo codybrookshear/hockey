@@ -118,7 +118,7 @@ func (s *Server) borrowLogos(ctx context.Context, st stats) {
 			continue
 		}
 		id := other.ID
-		r := s.seasonLogos.Get(ctx, strconv.Itoa(id), func(ctx context.Context) (map[string]string, error) {
+		r := s.seasonLogos.Serve(ctx, strconv.Itoa(id), func(ctx context.Context) (map[string]string, error) {
 			divs, err := s.cfg.Source.Standings(ctx, id)
 			if err != nil {
 				return nil, err
@@ -168,7 +168,7 @@ func (s *Server) logo(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	res := s.logos.Get(r.Context(), u, func(ctx context.Context) (Logo, error) { return s.cfg.Logo(ctx, u) })
+	res := s.logos.Serve(r.Context(), u, func(ctx context.Context) (Logo, error) { return s.cfg.Logo(ctx, u) })
 	if res.Err != nil {
 		s.cfg.Log.Warn("logo unavailable", "team", id, "err", res.Err.Error())
 		http.NotFound(w, r)

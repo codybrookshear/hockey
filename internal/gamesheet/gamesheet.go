@@ -96,6 +96,17 @@ type Side struct {
 	Record     string // overall W-L-OTL-SOL, as of now
 	DivisionID int
 	Scorers    []Goal
+	// From the scoresheet; all zero where a league doesn't record them.
+	Shots     int
+	PPGoals   int
+	PPChances int
+	Periods   []PeriodGoals // in order; a scheduled game has none
+}
+
+// PeriodGoals is a team's goals in one period ("1", "2", "3", "OT"…).
+type PeriodGoals struct {
+	Period string
+	Goals  int
 }
 
 // TBD reports a playoff slot not yet filled.
@@ -318,7 +329,11 @@ type rawSide struct {
 		ID    int    `json:"id"`
 		Title string `json:"title"`
 	} `json:"division"`
-	GoalDetails []struct {
+	Shots         int            `json:"shots"`
+	PPGoals       int            `json:"ppGoals"`
+	PPChances     int            `json:"ppOpportunities"`
+	GoalsByPeriod map[string]int `json:"goalsByPeriod"` // "1", "2", "3"… and "final"
+	GoalDetails   []struct {
 		ID        int    `json:"id"`
 		FirstName string `json:"firstName"`
 		LastName  string `json:"lastName"`
@@ -353,7 +368,16 @@ func (r rawSide) side() Side {
 		Result:     r.Result,
 		Record:     r.Record,
 		DivisionID: r.Division.ID,
+		Shots:      r.Shots,
+		PPGoals:    r.PPGoals,
+		PPChances:  r.PPChances,
 	}
+	for p, n := range r.GoalsByPeriod {
+		if p != "final" {
+			s.Periods = append(s.Periods, PeriodGoals{Period: p, Goals: n})
+		}
+	}
+	slices.SortFunc(s.Periods, func(a, b PeriodGoals) int { return comparePeriods(a.Period, b.Period) })
 	for _, g := range r.GoalDetails {
 		s.Scorers = append(s.Scorers, Goal{
 			Period: g.Period, Clock: g.Clock,
@@ -361,6 +385,22 @@ func (r rawSide) side() Side {
 		})
 	}
 	return s
+}
+
+// comparePeriods orders period names: "1", "2", "3", then overtimes and the
+// shootout, by name ("OT", "OT2", "SO").
+func comparePeriods(a, b string) int {
+	na, errA := strconv.Atoi(a)
+	nb, errB := strconv.Atoi(b)
+	switch {
+	case errA == nil && errB == nil:
+		return cmp.Compare(na, nb)
+	case errA == nil:
+		return -1
+	case errB == nil:
+		return 1
+	}
+	return cmp.Compare(a, b)
 }
 
 func (c *Client) get(ctx context.Context, path string, q url.Values, v any) error {

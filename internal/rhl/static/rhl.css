@@ -284,31 +284,21 @@ summary::-webkit-details-marker { display: none; }
 .meta .live { color: var(--live); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
 .is-live { box-shadow: inset 3px 0 0 var(--live); border-radius: var(--radius); }
 
-/* Cards that open show a chevron. */
-details.game > summary .meta::after {
+/* A game that has its own page: the whole card is the link. */
+a.game { display: block; color: inherit; }
+a.game .meta::after {
   content: "";
   justify-self: end;
   width: 0.45rem;
   height: 0.45rem;
-  margin-top: 0.2rem;
+  margin-top: 0.15rem;
   border-right: 2px solid var(--muted);
-  border-bottom: 2px solid var(--muted);
+  border-top: 2px solid var(--muted);
   transform: rotate(45deg);
 }
-details.game[open] > summary .meta::after { transform: rotate(225deg); margin-top: 0.4rem; }
+a.game:active { background: var(--line); }
 
-.goals {
-  list-style: none;
-  margin: 0;
-  padding: 0.35rem 0.75rem 0.6rem;
-  border-top: 1px solid var(--line);
-  font-size: 0.85rem;
-}
-
-.goals li { display: flex; gap: 0.6rem; padding: 0.2rem 0; }
-.goals .when { color: var(--muted); min-width: 5.2rem; font-variant-numeric: tabular-nums; }
-.goals .who { flex: 1; }
-.goals .abbr, .stats .abbr { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+.stats .abbr { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
 
 details.more > summary {
   padding: 0.6rem 0;
@@ -347,3 +337,142 @@ footer {
   color: var(--muted);
   font-size: 0.8rem;
 }
+
+/* Game page: the score, then the scoresheet. */
+.top-back { margin: 0.8rem 0 0; }
+
+.scoreboard {
+  margin-top: 0.7rem;
+  padding: 0.9rem 0.6rem 0.8rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.scoreboard p { margin: 0; }
+.scoreboard .state {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.scoreboard .live { color: var(--live); font-weight: 800; }
+.scoreboard .kind { color: var(--accent); }
+
+.matchup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.4rem;
+  margin: 0.7rem 0 0.6rem;
+}
+.club { display: grid; justify-items: center; gap: 0.3rem; min-width: 0; }
+.club h1 { font-size: 1rem; line-height: 1.2; overflow-wrap: anywhere; }
+.club h1 a { color: var(--fg); }
+.club .sub { font-size: 0.75rem; margin: 0; }
+.tally {
+  align-self: center;
+  display: flex;
+  gap: 0.35rem;
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.tally:has(.won) span:not(.won) { color: var(--muted); font-weight: 600; }
+.tally .dash, .tally .at { color: var(--muted); font-weight: 400; }
+.tally .at { font-size: 1rem; }
+.scoreboard .where { color: var(--muted); font-size: 0.85rem; }
+
+/* By-period tables: the team on the left, as logo and abbreviation. */
+.stats.line th[scope="row"], .compare .heads, .events .team {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.stats.line th[scope="row"] { padding-left: 0.6rem; }
+.stats.line td, .stats.line thead th { min-width: 2.2rem; }
+.stats .quiet td { color: var(--muted); font-weight: 400; }
+.stats.goalie-lines { margin-top: 0.5rem; }
+
+/* Team stats, side by side: visitor's number, what it is, home's number;
+   counts get a bar split between the two. */
+.compare {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.2rem 0.75rem 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.compare .heads {
+  padding: 0.5rem 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.compare .grow { flex: 1; }
+.compare .row {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr 4.5rem;
+  align-items: baseline;
+  padding: 0.45rem 0 0.4rem;
+  border-top: 1px solid var(--line);
+}
+.compare .label { text-align: center; color: var(--muted); font-size: 0.85rem; }
+.compare .val { font-weight: 700; }
+.compare .val:last-of-type { text-align: right; }
+.compare progress {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 6px;
+  margin-top: 0.35rem;
+  border: 0;
+  border-radius: 3px;
+  overflow: hidden;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--muted);    /* the home team's part */
+  color: var(--brand);
+}
+.compare progress::-webkit-progress-bar { background: var(--muted); }
+.compare progress::-webkit-progress-value { background: var(--brand); border-right: 2px solid var(--card); }
+.compare progress::-moz-progress-bar { background: var(--brand); border-right: 2px solid var(--card); }
+
+/* Goals and penalties, in order: time left, team, who and what, and the
+   score after it (or the minutes). */
+.events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+.events li {
+  display: grid;
+  grid-template-columns: 2.9rem 3.9rem minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: start;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--line);
+}
+.events li:first-child { border-top: 0; }
+.events .when { color: var(--muted); font-variant-numeric: tabular-nums; }
+.events .team { font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.events .detail { display: block; color: var(--muted); font-size: 0.8rem; }
+.events .count { color: var(--muted); font-size: 0.8rem; }
+.events .score { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.events .tag {
+  display: inline-block;
+  padding: 0 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--accent);
+  font-size: 0.65rem;
+  font-weight: 700;
+  vertical-align: 0.1em;
+}
+
+.sheet { margin: 1.2rem 0 0; font-weight: 600; }

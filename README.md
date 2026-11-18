@@ -7,9 +7,11 @@ to work well on a phone:
   daily schedule. One table for the Big Sheet, one for the Mini Sheet, with
   times, teams and locker rooms. (`cmd/schedule`, `internal/schedule`)
 - **[rhl.brookshear.party](https://rhl.brookshear.party)**: the RHL (adult
-  league). Pick a division at the top (remembered); standings, results with
-  goal scorers, upcoming games, scoring leaders and goalies follow it. A page
-  per team with its players' stats.
+  league). Pick a division at the top (remembered); standings, results,
+  upcoming games, scoring leaders and goalies follow it. A page per team with
+  its players' stats, and a page per game (tap a result or a live game): score
+  and shots on goal by period, team stats, goals with assists, penalties, and
+  each player's line.
   (`cmd/rhl`, `internal/rhl`)
 
 They're separate apps in separate containers. What they share: the cache and
@@ -36,6 +38,10 @@ Both sites send each source at most 20 requests a minute, one at a time, and
 cache answers (schedule days 10 minutes; RHL standings and games 3 minutes,
 player stats 10; team logos a day), whatever their own traffic. If a source
 is down, the last copy is shown, marked as old.
+
+The RHL site doesn't make visitors wait for GameSheet: it refreshes the
+current season in the background (less often when nobody's visiting), and
+serves anything else from the copy it has while it fetches a newer one.
 
 ## Privacy and security
 

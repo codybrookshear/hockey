@@ -1,8 +1,12 @@
 // Package rhl serves rhl.brookshear.party: the RHL (The Rink Exchange's adult
 // league) standings, results, upcoming games, scoring leaders, goalies and
-// team pages, from GameSheet, one division at a time: the current season, or
-// an earlier one picked from the season menu. Public: no login, no scripts;
-// one cookie, remembering the division picked.
+// team pages, and a page per game, from GameSheet, one division at a time:
+// the current season, or an earlier one picked from the season menu. Public:
+// no login, no scripts; one cookie, remembering the division picked.
+//
+// Visitors don't wait for GameSheet: Run keeps the current season's stats
+// fresh in the background, and anything else is served from the last copy
+// while a newer one is fetched (cache.Serve).
 package rhl
 
 import (
@@ -19,6 +23,7 @@ import (
 	"slices"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"hockey/internal/cache"
@@ -38,15 +43,30 @@ type Source interface {
 	Skaters(ctx context.Context, season int) ([]gamesheet.Skater, error)
 	Goalies(ctx context.Context, season int) ([]gamesheet.Goalie, error)
 	Roster(ctx context.Context, season, team int) (gamesheet.Roster, error)
+	BoxScore(ctx context.Context, season, game int) (gamesheet.BoxScore, error)
 }
 
 const (
 	seasonFreshFor  = 6 * time.Hour    // the league's seasons, and which is current
 	statsFreshFor   = 3 * time.Minute  // standings and games: live scores move
 	playersFreshFor = 10 * time.Minute // player stats and rosters: a few pages each, and change only after games
+	liveBoxFreshFor = time.Minute      // a live game's scoresheet
+	boxFreshFor     = 30 * time.Minute // a final's: corrections are rare
 	logoFreshFor    = 24 * time.Hour
 	retryAfter      = time.Minute
 	perMinute       = 20 // fetches a minute, to GameSheet and, separately, to its image CDN
+
+	// Run refreshes the current season a little sooner than it stops being
+	// fresh, so a visitor's request never has to: standings and games each
+	// time, player stats (a few pages) every third.
+	warmEvery        = statsFreshFor - 15*time.Second
+	warmPlayersEvery = 3
+	// With no visitors for a while, less often: the first one back gets
+	// stats at most this old, and a refresh starts behind them.
+	warmBoxesFor = 8 * 24 * time.Hour
+	warmBoxesMax = 12
+	idleAfter    = 30 * time.Minute
+	idleEvery    = 15 * time.Minute
 )
 
 type Config struct {
@@ -72,11 +92,15 @@ type Server struct {
 	skaters   *cache.Cache[[]gamesheet.Skater]
 	goalies   *cache.Cache[[]gamesheet.Goalie]
 	rosters   *cache.Cache[gamesheet.Roster]
+	boxes     *cache.Cache[gamesheet.BoxScore] // finals', by season/game
+	liveBoxes *cache.Cache[gamesheet.BoxScore]
 	// Other seasons' logos, by teamKey: for teams with none this season.
 	seasonLogos *cache.Cache[map[string]string]
 	logos       *cache.Cache[Logo]
 	pages       map[string]*template.Template
 	static      *serve.Static
+
+	lastVisit atomic.Int64 // Unix seconds; 0: no visitor yet
 
 	mu       sync.Mutex
 	logoURLs map[int]string // team ID → logo URL, from GameSheet's data: the only logos /logo/ will fetch
@@ -99,6 +123,8 @@ func New(cfg Config) (*Server, error) {
 		skaters:     cache.New[[]gamesheet.Skater](playersFreshFor, retryAfter, gs, cfg.Now),
 		goalies:     cache.New[[]gamesheet.Goalie](playersFreshFor, retryAfter, gs, cfg.Now),
 		rosters:     cache.New[gamesheet.Roster](playersFreshFor, retryAfter, gs, cfg.Now),
+		boxes:       cache.New[gamesheet.BoxScore](boxFreshFor, 10*time.Minute, gs, cfg.Now),
+		liveBoxes:   cache.New[gamesheet.BoxScore](liveBoxFreshFor, retryAfter, gs, cfg.Now),
 		seasonLogos: cache.New[map[string]string](logoFreshFor, 10*time.Minute, gs, cfg.Now),
 		logos:       cache.New[Logo](logoFreshFor, 10*time.Minute, cache.NewLimiter(perMinute, cfg.Now), cfg.Now),
 		logoURLs:    map[int]string{},
@@ -111,7 +137,7 @@ func New(cfg Config) (*Server, error) {
 		return nil, err
 	}
 	s.pages = map[string]*template.Template{}
-	for _, page := range []string{"home", "team"} {
+	for _, page := range []string{"home", "team", "game"} {
 		t, err := template.New("layout.html").Funcs(s.funcs()).
 			ParseFS(files, "templates/layout.html", "templates/games.html", "templates/"+page+".html")
 		if err != nil {
@@ -128,6 +154,7 @@ func (s *Server) Handler() http.Handler {
 	// GET patterns also match HEAD; other methods get 405.
 	mux.HandleFunc("GET /{$}", s.home)
 	mux.HandleFunc("GET /team/{id}", s.team)
+	mux.HandleFunc("GET /game/{id}", s.gamePage)
 	mux.HandleFunc("GET /logo/{id}", s.logo)
 	mux.Handle("GET /static/", s.static)
 	mux.HandleFunc("GET /robots.txt", serve.RobotsTxt)
@@ -140,7 +167,7 @@ const csp = "default-src 'none'; style-src 'self'; img-src 'self'; " +
 // leagueSeasons is the league's public seasons, latest first: the ones a
 // visitor can pick, which bounds the seasons anything is fetched for.
 func (s *Server) leagueSeasons(ctx context.Context) cache.Result[[]gamesheet.Season] {
-	return s.seasons.Get(ctx, "league", func(ctx context.Context) ([]gamesheet.Season, error) {
+	return s.seasons.Serve(ctx, "league", func(ctx context.Context) ([]gamesheet.Season, error) {
 		all, err := s.cfg.Source.LeagueSeasons(ctx, s.cfg.League)
 		if err != nil {
 			return nil, err
@@ -160,7 +187,7 @@ func (s *Server) leagueSeasons(ctx context.Context) cache.Result[[]gamesheet.Sea
 // league's current one, from its seasons (list).
 func (s *Server) currentSeason(ctx context.Context, list cache.Result[[]gamesheet.Season]) (gamesheet.Season, error) {
 	if s.cfg.Season != 0 {
-		r := s.season.Get(ctx, "configured", func(ctx context.Context) (gamesheet.Season, error) {
+		r := s.season.Serve(ctx, "configured", func(ctx context.Context) (gamesheet.Season, error) {
 			return s.cfg.Source.Season(ctx, s.cfg.Season)
 		})
 		return r.Value, r.Err
@@ -201,8 +228,24 @@ func seasonParam(r *http.Request) int {
 	return id
 }
 
+// visit loads the season a visitor's request asks for.
+func (s *Server) visit(r *http.Request) stats {
+	s.lastVisit.Store(s.cfg.Now().Unix())
+	return s.load(r.Context(), seasonParam(r), held)
+}
+
+// How load gets a season's stats: for a visitor, the copies held, however
+// old, with newer ones fetched behind them; for Run, from GameSheet now.
+type loading int
+
+const (
+	held         loading = iota
+	refreshGames         // standings and games now; player stats if no longer fresh
+	refreshAll
+)
+
 // load gets season want (0: the current one), if it's one of the league's.
-func (s *Server) load(ctx context.Context, want int) stats {
+func (s *Server) load(ctx context.Context, want int, how loading) stats {
 	var st stats
 	list := cache.Result[[]gamesheet.Season]{Err: errors.New("no league configured")}
 	if s.cfg.League != 0 {
@@ -239,10 +282,27 @@ func (s *Server) load(ctx context.Context, want int) stats {
 	}
 	id := st.Season.ID
 	key := strconv.Itoa(id)
-	dr := s.standings.Get(ctx, key, func(ctx context.Context) ([]gamesheet.Division, error) { return s.cfg.Source.Standings(ctx, id) })
-	gr := s.games.Get(ctx, key, func(ctx context.Context) ([]gamesheet.Game, error) { return s.cfg.Source.Games(ctx, id) })
-	sk := s.skaters.Get(ctx, key, func(ctx context.Context) ([]gamesheet.Skater, error) { return s.cfg.Source.Skaters(ctx, id) })
-	gl := s.goalies.Get(ctx, key, func(ctx context.Context) ([]gamesheet.Goalie, error) { return s.cfg.Source.Goalies(ctx, id) })
+	var (
+		dr cache.Result[[]gamesheet.Division]
+		gr cache.Result[[]gamesheet.Game]
+		sk cache.Result[[]gamesheet.Skater]
+		gl cache.Result[[]gamesheet.Goalie]
+	)
+	standings := func(ctx context.Context) ([]gamesheet.Division, error) { return s.cfg.Source.Standings(ctx, id) }
+	games := func(ctx context.Context) ([]gamesheet.Game, error) { return s.cfg.Source.Games(ctx, id) }
+	skaters := func(ctx context.Context) ([]gamesheet.Skater, error) { return s.cfg.Source.Skaters(ctx, id) }
+	goalies := func(ctx context.Context) ([]gamesheet.Goalie, error) { return s.cfg.Source.Goalies(ctx, id) }
+	switch how {
+	case refreshAll:
+		dr, gr = s.standings.Refresh(ctx, key, standings), s.games.Refresh(ctx, key, games)
+		sk, gl = s.skaters.Refresh(ctx, key, skaters), s.goalies.Refresh(ctx, key, goalies)
+	case refreshGames:
+		dr, gr = s.standings.Refresh(ctx, key, standings), s.games.Refresh(ctx, key, games)
+		sk, gl = s.skaters.Get(ctx, key, skaters), s.goalies.Get(ctx, key, goalies)
+	default:
+		dr, gr = s.standings.Serve(ctx, key, standings), s.games.Serve(ctx, key, games)
+		sk, gl = s.skaters.Serve(ctx, key, skaters), s.goalies.Serve(ctx, key, goalies)
+	}
 	st.Divisions, st.Games, st.Skaters, st.Goalies = dr.Value, gr.Value, sk.Value, gl.Value
 	for _, part := range []struct {
 		what  string
@@ -270,6 +330,79 @@ func (s *Server) load(ctx context.Context, want int) stats {
 	return st
 }
 
+// Run keeps the current season's stats and logos in memory and fresh until
+// ctx is done, so that pages are ready before anyone asks: a fixed number of
+// requests to GameSheet, however many visitors (or none) there are.
+func (s *Server) Run(ctx context.Context) {
+	tick := time.NewTicker(warmEvery)
+	defer tick.Stop()
+	var last time.Time
+	for n := 0; ; {
+		now := s.cfg.Now()
+		visited := time.Unix(s.lastVisit.Load(), 0)
+		if last.IsZero() || now.Sub(visited) < idleAfter || now.Sub(last) >= idleEvery {
+			s.warm(ctx, n%warmPlayersEvery == 0)
+			last = now
+			n++
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+	}
+}
+
+// warm fetches the current season's standings and games (and, with players,
+// its player stats), then what isn't held yet of its teams' logos and its
+// latest games' box scores.
+func (s *Server) warm(ctx context.Context, players bool) {
+	how := refreshGames
+	if players {
+		how = refreshAll
+	}
+	st := s.load(ctx, 0, how)
+	if st.Fatal {
+		return
+	}
+	seen := map[int]bool{}
+	logo := func(t gamesheet.Team) {
+		if t.ID == 0 || seen[t.ID] || ctx.Err() != nil {
+			return
+		}
+		seen[t.ID] = true
+		s.mu.Lock()
+		u, ok := s.logoURLs[t.ID]
+		s.mu.Unlock()
+		if ok {
+			s.logos.Get(ctx, u, func(ctx context.Context) (Logo, error) { return s.cfg.Logo(ctx, u) })
+		}
+	}
+	for _, d := range st.Divisions {
+		for _, t := range d.Teams {
+			logo(t.Team)
+		}
+	}
+	for _, g := range st.Games {
+		logo(g.Home.Team)
+		logo(g.Visitor.Team)
+	}
+	// The box scores of the games people open: the ones on now, and the
+	// last week's results, latest first.
+	now, recent := s.cfg.Now(), 0
+	for _, g := range slices.Backward(st.Games) {
+		if ctx.Err() != nil {
+			return
+		}
+		if g.Live() || (g.Final() && now.Sub(g.Start) < warmBoxesFor && recent < warmBoxesMax) {
+			if g.Final() {
+				recent++
+			}
+			s.boxScore(ctx, st.Season.ID, g, true)
+		}
+	}
+}
+
 func (s *Server) render(w http.ResponseWriter, page string, status int, data any) {
 	var buf bytes.Buffer
 	if err := s.pages[page].ExecuteTemplate(&buf, "layout.html", data); err != nil {
@@ -278,6 +411,11 @@ func (s *Server) render(w http.ResponseWriter, page string, status int, data any
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if status == http.StatusOK {
+		// Public stats: the browser may keep the page for going back to it
+		// (from a game to the list), and asks again otherwise.
+		w.Header().Set("Cache-Control", "private, no-cache")
+	}
 	w.WriteHeader(status)
 	w.Write(buf.Bytes())
 }
@@ -287,7 +425,7 @@ func (s *Server) render(w http.ResponseWriter, page string, status int, data any
 const divisionCookie = "division"
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
-	st := s.load(r.Context(), seasonParam(r))
+	st := s.visit(r)
 	status := http.StatusOK
 	switch {
 	case st.NoSeason:
@@ -321,7 +459,7 @@ func (s *Server) team(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	st := s.load(r.Context(), seasonParam(r))
+	st := s.visit(r)
 	d, ok := s.teamData(st, id)
 	switch {
 	case st.NoSeason:
@@ -335,7 +473,7 @@ func (s *Server) team(w http.ResponseWriter, r *http.Request) {
 		// The roster: only for a team in the season's data, which bounds
 		// what's fetched. Without it, the players who've played.
 		season := st.Season.ID
-		rr := s.rosters.Get(r.Context(), fmt.Sprint(season, "/", id), func(ctx context.Context) (gamesheet.Roster, error) {
+		rr := s.rosters.Serve(r.Context(), fmt.Sprint(season, "/", id), func(ctx context.Context) (gamesheet.Roster, error) {
 			return s.cfg.Source.Roster(ctx, season, id)
 		})
 		if rr.Err != nil {
