@@ -1,0 +1,182 @@
+{{define "title"}}{{if .Found}}{{.Game.Visitor.Name}} at {{.Game.Home.Name}} · {{end}}RHL{{end}}
+
+{{/* A live game's page reloads itself: no scripts, so the browser's own refresh. */}}
+{{define "head"}}{{with .Refresh}}<meta http-equiv="refresh" content="{{.}}">{{end}}{{end}}
+
+{{/* A team in a table's row: its logo and abbreviation. */}}
+{{define "abbr"}}{{template "logo" .}}<span>{{or .Abbr .Name}}</span>{{end}}
+
+{{define "linescore"}}
+<table class="stats line">
+  <thead>
+    <tr>
+      <th class="who" scope="col"><span class="vh">Team</span></th>
+      {{- range .Columns}}<th scope="col">{{.}}</th>{{end}}
+      <th class="pts" scope="col">T</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{- range .Rows}}
+    <tr>
+      <th class="who" scope="row">{{template "abbr" .}}</th>
+      {{- range .Cells}}<td>{{.}}</td>{{end}}
+      <td class="pts">{{.Total}}</td>
+    </tr>
+    {{- end}}
+  </tbody>
+</table>
+{{end}}
+
+{{define "content"}}
+<p class="back top-back"><a href="{{.Back}}">‹ All games</a></p>
+{{- if .Found}}
+{{- with .Game}}
+<section class="scoreboard{{if .Live}} is-live{{end}}">
+  <p class="state">{{if .Live}}<span class="live">Live</span>{{else}}{{$.Status}}{{end}}{{with .Kind}} · <span class="kind">{{.}}</span>{{end}}</p>
+  <div class="matchup">
+    {{- range $i, $s := (list .Visitor .Home)}}
+    <div class="club{{if $s.Won}} won{{end}}">
+      {{- if $s.HasLogo}}<img class="logo big" src="/logo/{{$s.ID}}" alt="" width="56" height="56">
+      {{- else if $s.TBD}}<span class="logo big"></span>
+      {{- else}}<span class="logo big initial" aria-hidden="true">{{initial $s.Name}}</span>{{end}}
+      <h1>{{template "teamname" $s}}</h1>
+      <p class="sub">{{if $i}}Home{{else}}Visitor{{end}}{{with $s.Record}} · {{.}}{{end}}</p>
+    </div>
+    {{- if not $i}}
+    <p class="tally">
+      {{- if or $.Game.Final $.Game.Live}}<span{{if $.Game.Visitor.Won}} class="won"{{end}}>{{$.Game.Visitor.Goals}}</span><span class="dash">–</span><span{{if $.Game.Home.Won}} class="won"{{end}}>{{$.Game.Home.Goals}}</span>
+      {{- else}}<span class="at">at</span>{{end -}}
+    </p>
+    {{- end}}
+    {{- end}}
+  </div>
+  <p class="where">{{$.When}}{{with $.Where}} · {{.}}{{end}}</p>
+  <p class="where">{{.Division}}{{with $.Number}} · Game {{.}}{{end}}</p>
+</section>
+{{- end}}
+
+{{- if .Goals}}
+<section>
+  <h2>Score by period</h2>
+  {{template "linescore" (dict "Columns" .Columns "Rows" .Goals)}}
+</section>
+{{- end}}
+
+{{- if .Shots}}
+<section>
+  <h2>Shots on goal by period</h2>
+  {{template "linescore" (dict "Columns" .Columns "Rows" .Shots)}}
+</section>
+{{- end}}
+
+{{- if .Compare}}
+<section>
+  <h2>Team stats</h2>
+  <div class="compare">
+    <div class="heads">{{template "abbr" .Game.Visitor}}<span class="grow"></span>{{template "abbr" .Game.Home}}</div>
+    {{- range .Compare}}
+    <div class="row">
+      <span class="val">{{.Visitor}}</span><span class="label">{{.Label}}</span><span class="val">{{.Home}}</span>
+      {{- if ge .Share 0}}<progress max="100" value="{{.Share}}" aria-hidden="true"></progress>{{end}}
+    </div>
+    {{- end}}
+  </div>
+</section>
+{{- end}}
+
+{{- if or .Game.Final .Game.Live}}
+<section>
+  <h2>Scoring</h2>
+  {{- range .Scoring}}
+  <h3>{{.Label}}</h3>
+  <ol class="events">
+    {{- range .Goals}}
+    <li>
+      <span class="when">{{.Clock}}</span>
+      <span class="team">{{template "abbr" .Team}}</span>
+      <span class="what">
+        <strong>{{.Name}}</strong>{{with .Count}} <span class="count">({{.}})</span>{{end}}
+        {{- range .Tags}} <span class="tag">{{.}}</span>{{end}}
+        {{- if not $.Scorers}}<span class="detail">{{with .Assists}}{{.}}{{else}}Unassisted{{end}}</span>{{end}}
+      </span>
+      <span class="score">{{.Score}}</span>
+    </li>
+    {{- end}}
+  </ol>
+  {{- else}}
+  <p class="empty">No goals{{if .Game.Live}} yet{{end}}.</p>
+  {{- end}}
+</section>
+{{- end}}
+
+{{- if or .Penalty .NoCalls}}
+<section>
+  <h2>Penalties</h2>
+  {{- range .Penalty}}
+  <h3>{{.Label}}</h3>
+  <ol class="events">
+    {{- range .Penalties}}
+    <li>
+      <span class="when">{{.Clock}}</span>
+      <span class="team">{{template "abbr" .Team}}</span>
+      <span class="what"><strong>{{.Name}}</strong><span class="detail">{{.Infraction}}</span></span>
+      <span class="score">{{with .Minutes}}{{.}} min{{end}}</span>
+    </li>
+    {{- end}}
+  </ol>
+  {{- else}}
+  <p class="empty">No penalties{{if .Game.Live}} yet{{end}}.</p>
+  {{- end}}
+</section>
+{{- end}}
+
+{{- range .Lineups}}
+<section>
+  <h2>{{.Team.Name}}</h2>
+  {{- with .Skaters}}
+  <table class="stats">
+    <thead>
+      <tr>
+        <th class="num" scope="col">#</th><th class="who" scope="col">Player</th>
+        <th scope="col">G</th><th scope="col">A</th><th class="pts" scope="col">PTS</th><th scope="col">PIM</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{- range .}}
+      <tr{{if not .PTS}} class="quiet"{{end}}>
+        <td class="num">{{.Number}}</td><td class="who">{{.Name}}</td>
+        <td>{{.G}}</td><td>{{.A}}</td><td class="pts">{{.PTS}}</td><td>{{.PIM}}</td>
+      </tr>
+      {{- end}}
+    </tbody>
+  </table>
+  {{- end}}
+  {{- with .Goalies}}
+  <table class="stats goalie-lines">
+    <thead>
+      <tr>
+        <th class="num" scope="col">#</th><th class="who" scope="col">Goalie</th>
+        <th scope="col">SA</th><th scope="col">SV</th><th class="pts" scope="col">SV%</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{- range .}}
+      <tr>
+        <td class="num">{{.Number}}</td><td class="who">{{.Name}}</td>
+        {{- if .GoalieCounts}}<td>{{.Faced}}</td><td>{{.Saves}}</td><td class="pts">{{svpct .SVPct}}</td>
+        {{- else}}<td>–</td><td>–</td><td class="pts">–</td>{{end}}
+      </tr>
+      {{- end}}
+    </tbody>
+  </table>
+  {{- end}}
+</section>
+{{- end}}
+
+{{- if or .Game.Final .Game.Live}}
+<p class="sheet"><a href="{{.Sheet}}" rel="noreferrer">This game on GameSheet ›</a></p>
+{{- else}}
+<p class="empty">This game hasn't started. Its breakdown will be here once it has.</p>
+{{- end}}
+{{- end}}
+{{end}}

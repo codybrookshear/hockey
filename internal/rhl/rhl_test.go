@@ -63,6 +63,8 @@ func savedGameSheetWith(t *testing.T, more map[string]string) *countingSource {
 		"/api/unified-games/15331":       "unified-games-15331.json",
 		"/api/goalies/standings/15331":   "goalies-15331.json",
 		"/api/teams/15331/554799/roster": "roster-15331-554799.json",
+		// Put together from notes on the endpoint, not saved: see gamesheet's test.
+		"/api/useBoxScore/getGameStats/15331/games/2986401": "boxscore-2986401-reconstructed.json",
 	}
 	for k, v := range more {
 		files[k] = v
@@ -161,6 +163,13 @@ func (c *countingSource) Games(ctx context.Context, id int) ([]gamesheet.Game, e
 		return nil, err
 	}
 	return c.Source.Games(ctx, id)
+}
+
+func (c *countingSource) BoxScore(ctx context.Context, season, game int) (gamesheet.BoxScore, error) {
+	if err := c.note("box score"); err != nil {
+		return gamesheet.BoxScore{}, err
+	}
+	return c.Source.BoxScore(ctx, season, game)
 }
 
 type logoLog struct {
@@ -692,5 +701,170 @@ func TestTeamKey(t *testing.T) {
 		if got := teamKey(in); got != want {
 			t.Errorf("teamKey(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestGamePage(t *testing.T) {
+	src := savedGameSheet(t)
+	h := newServer(t, Config{Source: src, League: 620287})
+
+	// Results and live games link to their pages; games to come don't.
+	home := get(t, h, "/").Body.String()
+	for _, want := range []string{`<a class="game" href="/game/2986401">`, `<a class="game" href="/game/2986420">`} {
+		if !strings.Contains(home, want) {
+			t.Errorf("home lacks %q", want)
+		}
+	}
+	if strings.Contains(home, `href="/game/2986422"`) || strings.Contains(home, "<details class=\"game\"") {
+		t.Error("home links to a game that hasn't started, or still has a drop-down")
+	}
+	if regexp.MustCompile(`(?s)<a class="game"[^>]*>(?:[^<]|<[^/a]|</[^a])*<a `).MatchString(home) {
+		t.Error("a link inside a game's link")
+	}
+
+	w := get(t, h, "/game/2986401")
+	if w.Code != http.StatusOK {
+		t.Fatalf("GET /game/2986401: %d\n%s", w.Code, w.Body)
+	}
+	body := w.Body.String()
+	for _, want := range []string{
+		"<title>Pirates at Orange · RHL</title>",
+		`<a href="/team/554805">Pirates</a>`, "Visitor · 2-1-0-0",
+		`<span class="won">9</span><span class="dash">–</span><span>7</span>`,
+		"Sun, Sep 13 · 9:00 AM · The Rink Exchange", "A/B Division · Game 1",
+		"<h2>Score by period</h2>", "<td>2</td><td>3</td><td>4</td>",
+		"<h2>Shots on goal by period</h2>", "<td>11</td><td>13</td><td>14</td>",
+		`<span class="val">38</span><span class="label">Shots on goal</span><span class="val">41</span>`,
+		`<progress max="100" value="48"`,
+		`<span class="val">23.7%</span><span class="label">Shooting %</span><span class="val">17.1%</span>`,
+		`<span class="val">.829</span><span class="label">Save %</span><span class="val">.763</span>`,
+		`<span class="val">2</span><span class="label">Penalty minutes</span><span class="val">4</span>`,
+		"<h3>1st period</h3>", "<strong>Derek Dusome</strong>", "Robert Funk, Leo Katz", "Unassisted",
+		`<span class="tag">PP</span>`, `<span class="tag">GWG</span>`,
+		`<span class="score">9–7</span>`,
+		"<h2>Penalties</h2>", "Tripping - Minor", "<strong>Bench</strong>",
+		`<td class="num">1</td><td class="who">Chris Pirategoalie</td><td>41</td><td>34</td><td class="pts">.829</td>`,
+		"https://gamesheetstats.com/seasons/15331/games/2986401",
+		`href="/?division=82591"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("game page lacks %q", want)
+		}
+	}
+	if strings.Contains(body, "Scratch") || strings.Contains(body, "http-equiv") || strings.Contains(body, "<script") {
+		t.Error("game page shows a scratched player, reloads itself, or has a script")
+	}
+	// The first goal of the game is Orange's (09:59 left in the 1st), before the Pirates' at 03:03.
+	if strings.Index(body, "Justin Bristol") > strings.Index(body, "Derek Dusome") {
+		t.Error("goals not in order")
+	}
+	if got := w.Header().Get("Cache-Control"); got != "private, no-cache" {
+		t.Errorf("Cache-Control %q", got)
+	}
+	get(t, h, "/game/2986401")
+	if n := src.count("box score"); n != 1 {
+		t.Errorf("box score fetched %d times", n)
+	}
+
+	// No box score (not saved): the page from the games list, saying so.
+	w = get(t, h, "/game/2986402")
+	body = w.Body.String()
+	if w.Code != http.StatusOK || !strings.Contains(body, "full scoresheet") || !strings.Contains(body, "<h2>Scoring</h2>") ||
+		!strings.Contains(body, "Shots on goal") || strings.Contains(body, "Unassisted") || strings.Contains(body, "<h2>Penalties</h2>") {
+		t.Errorf("without a box score: %d\n%s", w.Code, body)
+	}
+	// Live: reloads itself.
+	if b := get(t, h, "/game/2986420").Body.String(); !strings.Contains(b, `<meta http-equiv="refresh" content="60">`) || !strings.Contains(b, "No goals yet.") {
+		t.Error("live game: no reload, or no word on goals")
+	}
+	// Not started: no box score asked for.
+	n := src.count("box score")
+	if w := get(t, h, "/game/2986422"); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "hasn't started") || src.count("box score") != n {
+		t.Errorf("scheduled game: %d", w.Code)
+	}
+	for _, bad := range []string{"/game/1", "/game/x", "/game/0"} {
+		if w := get(t, h, bad); w.Code != http.StatusNotFound {
+			t.Errorf("%s: %d", bad, w.Code)
+		}
+	}
+	if src.count("box score") != n {
+		t.Error("asked GameSheet for a game that isn't in the season")
+	}
+	// Another team's box score isn't this game's.
+	src = savedGameSheetWith(t, map[string]string{"/api/useBoxScore/getGameStats/15331/games/2986402": "boxscore-2986401-reconstructed.json"})
+	h = newServer(t, Config{Source: src, League: 620287})
+	if b := get(t, h, "/game/2986402").Body.String(); !strings.Contains(b, "full scoresheet") || strings.Contains(b, "Tripping") {
+		t.Error("showed another game's box score")
+	}
+}
+
+// Visitors don't wait for GameSheet: Run's rounds fetch, pages don't.
+func TestNoVisitorWaits(t *testing.T) {
+	src := savedGameSheet(t)
+	logos := &logoLog{}
+	now := time.Date(2026, 10, 4, 21, 0, 0, 0, la)
+	var mu sync.Mutex
+	clock := func() time.Time { mu.Lock(); defer mu.Unlock(); return now }
+	s, err := New(Config{Source: src, League: 620287, Logo: logos.fetch, Location: la, Log: quiet, Now: clock})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := s.Handler()
+	counts := func() map[string]int {
+		src.mu.Lock()
+		defer src.mu.Unlock()
+		out := map[string]int{}
+		for k, v := range src.calls {
+			out[k] = v
+		}
+		return out
+	}
+	same := func(a, b map[string]int) bool { return fmt.Sprint(a) == fmt.Sprint(b) }
+
+	s.warm(context.Background(), true)
+	warmed := counts()
+	if warmed["games"] != 1 || warmed["skaters"] != 1 || warmed["box score"] == 0 || len(logos.urls) == 0 {
+		t.Fatalf("warm fetched %v, %d logos", warmed, len(logos.urls))
+	}
+	nLogos := len(logos.urls)
+	for _, target := range []string{"/", "/game/2986419", "/logo/554805"} { // a result from today
+		if w := get(t, h, target); w.Code != http.StatusOK {
+			t.Errorf("%s: %d", target, w.Code)
+		}
+	}
+	if got := counts(); !same(got, warmed) || len(logos.urls) != nLogos {
+		t.Errorf("pages fetched: %v, was %v", got, warmed)
+	}
+
+	// The next round: standings and games again, not the players (still
+	// fresh), logos or finals' box scores.
+	mu.Lock()
+	now = now.Add(warmEvery)
+	mu.Unlock()
+	s.warm(context.Background(), false)
+	got := counts()
+	if got["games"] != 2 || got["standings"] != warmed["standings"]+1 || got["skaters"] != 1 || len(logos.urls) != nLogos {
+		t.Errorf("second round fetched %v, was %v", got, warmed)
+	}
+
+	// With no rounds (a long idle), a visitor still gets the page at once,
+	// from what's held, and the fetch happens behind them.
+	mu.Lock()
+	now = now.Add(time.Hour)
+	mu.Unlock()
+	before := counts()
+	w := get(t, h, "/")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "updated 9:00 PM") || strings.Contains(w.Body.String(), "Couldn't reach") {
+		t.Errorf("after an hour: %d", w.Code)
+	}
+	s.standings.Wait()
+	s.games.Wait()
+	s.skaters.Wait()
+	s.goalies.Wait()
+	if after := counts(); after["games"] != before["games"]+1 || after["skaters"] != before["skaters"]+1 {
+		t.Errorf("no refresh behind the visitor: %v, was %v", after, before)
+	}
+	if !strings.Contains(get(t, h, "/").Body.String(), "updated 10:02 PM") {
+		t.Error("the next visitor doesn't get the refreshed stats")
 	}
 }

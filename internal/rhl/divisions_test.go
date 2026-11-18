@@ -2,6 +2,7 @@ package rhl
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -83,6 +84,10 @@ func (fourDivisions) Goalies(context.Context, int) ([]gamesheet.Goalie, error) {
 
 func (fourDivisions) Roster(context.Context, int, int) (gamesheet.Roster, error) {
 	return gamesheet.Roster{}, nil
+}
+
+func (fourDivisions) BoxScore(context.Context, int, int) (gamesheet.BoxScore, error) {
+	return gamesheet.BoxScore{}, errors.New("no box scores")
 }
 
 func TestFourDivisions(t *testing.T) {

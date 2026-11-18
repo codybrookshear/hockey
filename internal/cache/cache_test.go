@@ -152,3 +152,62 @@ func TestPruneForgetsIdleKeys(t *testing.T) {
 		t.Errorf("%d keys, want 1", cache.Len())
 	}
 }
+
+func TestServeReturnsTheOldValueAndRefetchesBehind(t *testing.T) {
+	c, cache, f := setup()
+	ctx := context.Background()
+	// Nothing yet: the first visitor waits.
+	if r := cache.Serve(ctx, "k", f.fetch); r.Err != nil || r.Value != "value" || f.n() != 1 {
+		t.Fatalf("first: %+v after %d fetches", r, f.n())
+	}
+	cache.Serve(ctx, "k", f.fetch)
+	cache.Wait()
+	if f.n() != 1 {
+		t.Fatalf("a fresh value was fetched again: %d", f.n())
+	}
+	// No longer fresh: served as it is (not a failure, so not Stale), and
+	// fetched once behind the visitors.
+	fetched := c.now()
+	c.add(11 * time.Minute)
+	for range 5 {
+		if r := cache.Serve(ctx, "k", f.fetch); r.Err != nil || r.Stale || !r.Fetched.Equal(fetched) {
+			t.Fatalf("old value: %+v", r)
+		}
+	}
+	cache.Wait()
+	if n := f.n(); n < 2 || n > 5 {
+		t.Fatalf("fetched %d times", n)
+	}
+	if r := cache.Serve(ctx, "k", f.fetch); !r.Fetched.Equal(c.now()) {
+		t.Fatalf("not refreshed: %+v", r)
+	}
+	// The source fails: the old value, marked stale once it's known, and
+	// no new attempt until RetryAfter.
+	c.add(11 * time.Minute)
+	f.mu.Lock()
+	f.err = errors.New("down")
+	f.mu.Unlock()
+	cache.Serve(ctx, "k", f.fetch)
+	cache.Wait()
+	n := f.n()
+	if r := cache.Serve(ctx, "k", f.fetch); r.Err != nil || !r.Stale || r.Value != "value" {
+		t.Fatalf("after a failure: %+v", r)
+	}
+	cache.Wait()
+	if f.n() != n {
+		t.Fatalf("retried within RetryAfter")
+	}
+}
+
+func TestRefreshFetchesAFreshValue(t *testing.T) {
+	_, cache, f := setup()
+	ctx := context.Background()
+	cache.Get(ctx, "k", f.fetch)
+	if r := cache.Refresh(ctx, "k", f.fetch); r.Err != nil || f.n() != 2 {
+		t.Fatalf("refresh: %+v after %d fetches", r, f.n())
+	}
+	cache.Get(ctx, "k", f.fetch)
+	if f.n() != 2 {
+		t.Fatalf("fetched %d times, want 2", f.n())
+	}
+}

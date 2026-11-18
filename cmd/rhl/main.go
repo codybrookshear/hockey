@@ -78,6 +78,8 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	// Keeps the stats in memory and fresh, so no visitor waits for GameSheet.
+	go srv.Run(ctx)
 	ln, where, err := serve.Listen(os.Getenv("RHL_SOCKET"), serve.EnvOr("RHL_ADDR", "127.0.0.1:8082"))
 	if err != nil {
 		return err

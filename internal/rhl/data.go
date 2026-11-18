@@ -47,6 +47,7 @@ func (l links) query(sep string) string {
 }
 
 func (l links) team(id int) string { return fmt.Sprint("/team/", id) + l.query("?") }
+func (l links) game(id int) string { return fmt.Sprint("/game/", id) + l.query("?") }
 
 // home is the home page, on division div (0: the remembered one).
 func (l links) home(div int) string {
@@ -120,6 +121,7 @@ type day struct {
 
 type game struct {
 	ID       int
+	Href     string // the game's page: once it's live or final
 	Day      string // "Sun, Oct 4"
 	Time     string // "9:00 AM"
 	Visitor  side
@@ -129,7 +131,6 @@ type game struct {
 	Tie      bool
 	Kind     string // "Playoff", "Exhibition", or ""
 	Division string
-	Goals    []goal
 	ShowDay  bool // on lists not grouped by day
 }
 
@@ -138,17 +139,11 @@ type side struct {
 	Name    string
 	Href    string // the team's page
 	Abbr    string
+	Record  string // W-L-OTL-SOL, as of now
 	Goals   int
 	Won     bool
 	TBD     bool
 	HasLogo bool
-}
-
-type goal struct {
-	Period string // "1st", "OT"
-	Clock  string // time left in the period
-	Name   string
-	Team   string // abbreviation
 }
 
 // skater is a row of a skaters table: the league's leaders (Rank and Team
@@ -353,25 +348,14 @@ func (s *Server) game(g gamesheet.Game, l links) game {
 		row.Home.Won = g.Home.Goals > g.Visitor.Goals
 		row.Tie = g.Home.Goals == g.Visitor.Goals
 	}
-	for _, sd := range []gamesheet.Side{g.Visitor, g.Home} {
-		for _, gl := range sd.Scorers {
-			row.Goals = append(row.Goals, goal{
-				Period: period(gl.Period), Clock: gl.Clock, Name: playerName(gl.Player), Team: sd.Abbr,
-			})
-		}
+	if row.Final || row.Live {
+		row.Href = l.game(g.ID)
 	}
-	// In order: by period, then by time left on the clock, most first.
-	slices.SortStableFunc(row.Goals, func(a, b goal) int {
-		if c := cmp.Compare(periodOrder(a.Period), periodOrder(b.Period)); c != 0 {
-			return c
-		}
-		return cmp.Compare(b.Clock, a.Clock) // "mm:ss", zero-padded
-	})
 	return row
 }
 
 func (s *Server) side(sd gamesheet.Side, l links) side {
-	out := side{ID: sd.ID, Name: sd.Title, Abbr: sd.Abbr, Goals: sd.Goals, TBD: sd.TBD()}
+	out := side{ID: sd.ID, Name: sd.Title, Abbr: sd.Abbr, Record: sd.Record, Goals: sd.Goals, TBD: sd.TBD()}
 	if out.TBD {
 		out.Name = "TBD"
 	} else {
@@ -556,38 +540,6 @@ func goalies(all []gamesheet.Goalie, include func(team int) bool, l *links) []go
 	return out
 }
 
-func period(p string) string {
-	switch p {
-	case "1":
-		return "1st"
-	case "2":
-		return "2nd"
-	case "3":
-		return "3rd"
-	case "4", "OT", "ot":
-		return "OT"
-	case "SO", "so":
-		return "SO"
-	}
-	return p
-}
-
-func periodOrder(p string) int {
-	switch p {
-	case "1st":
-		return 1
-	case "2nd":
-		return 2
-	case "3rd":
-		return 3
-	case "OT":
-		return 4
-	case "SO":
-		return 5
-	}
-	return 6
-}
-
 // playerName tidies names entered in all capitals (or all lower case):
 // "DEREK DUSOME" → "Derek Dusome", "O'NEIL-SMITH" → "O'Neil-Smith",
 // "MCMACKIN" → "McMackin". Mixed case is left as entered.
@@ -641,8 +593,23 @@ func (s *Server) funcs() template.FuncMap {
 		},
 		"stamp": func(t time.Time) string { return t.Format("3:04 PM") },
 		"list":  func(xs ...any) []any { return xs },
+		// dict "Key" value… : several values for one template.
+		"dict": func(kv ...any) (map[string]any, error) {
+			if len(kv)%2 != 0 {
+				return nil, fmt.Errorf("dict: odd number of arguments")
+			}
+			m := map[string]any{}
+			for i := 0; i < len(kv); i += 2 {
+				k, ok := kv[i].(string)
+				if !ok {
+					return nil, fmt.Errorf("dict: key %v is not a string", kv[i])
+				}
+				m[k] = kv[i+1]
+			}
+			return m, nil
+		},
 		// .901, the way save percentage is written
-		"svpct": func(f float64) string { return strings.TrimPrefix(fmt.Sprintf("%.3f", f), "0") },
+		"svpct": fmtSVPct,
 		"gaa":   func(f float64) string { return fmt.Sprintf("%.2f", f) },
 		// A badge for teams without a logo: their initial.
 		"initial": func(name string) string {
